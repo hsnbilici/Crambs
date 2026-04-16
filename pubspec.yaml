@@ -1,0 +1,65 @@
+name: crumbs
+description: Project Crumbs — mobile idle game
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management (CLAUDE.md §7)
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Save persist (docs/save-format.md §2.1)
+  path_provider: ^2.1.5
+
+  # SaveEnvelope checksum — SHA-256 (docs/save-format.md §3)
+  crypto: ^3.0.6
+
+  # Routing
+  go_router: ^14.6.2
+
+  # Lokalizasyon / format
+  intl: ^0.19.0
+
+  # Immutable state modeli (GameState, SaveEnvelope)
+  freezed_annotation: ^2.4.4
+
+  # Save serialize (docs/save-format.md §1)
+  json_annotation: ^4.9.0
+
+  # Analytics / Monetization (ayrı runbook ile yapılandırılır)
+  firebase_core: ^3.8.0
+  firebase_analytics: ^11.3.3
+  google_mobile_ads: ^5.3.0
+  in_app_purchase: ^3.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+  # Test mocking
+  mocktail: ^1.0.4
+
+  # Code generation
+  build_runner: ^2.4.13
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
+  riverpod_generator: ^2.6.1
+
+  # Lint
+  custom_lint: ^0.7.0
+  riverpod_lint: ^2.6.1
+  very_good_analysis: ^7.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
