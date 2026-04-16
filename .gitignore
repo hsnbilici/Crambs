@@ -1,0 +1,17 @@
+# Claude Code local state
+.claude/
+
+# macOS
+.DS_Store
+
+# Flutter / Dart (scaffold PR sonrası geçerli)
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+*.iml
+.idea/
