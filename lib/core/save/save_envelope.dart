@@ -6,7 +6,7 @@ part 'save_envelope.g.dart';
 /// SaveEnvelope şeması — docs/save-format.md §1
 /// TODO: gameState alanı GameState tipine geçirilecek — ayrı task
 @freezed
-class SaveEnvelope with _$SaveEnvelope {
+abstract class SaveEnvelope with _$SaveEnvelope {
   const factory SaveEnvelope({
     required int version,
     required String lastSavedAt,

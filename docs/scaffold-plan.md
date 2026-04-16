@@ -68,7 +68,7 @@ publish_to: 'none'
 version: 0.1.0+1
 
 environment:
-  sdk: ">=3.6.0 <4.0.0"
+  sdk: ^3.8.0
   flutter: ">=3.27.0"
 
 dependencies:
@@ -76,8 +76,8 @@ dependencies:
     sdk: flutter
 
   # State management (CLAUDE.md §7)
-  flutter_riverpod: ^2.6.1
-  riverpod_annotation: ^2.6.1
+  flutter_riverpod: ^3.1.0
+  riverpod_annotation: ^4.0.0
 
   # Save persist (docs/save-format.md §2.1)
   path_provider: ^2.1.5
@@ -86,21 +86,21 @@ dependencies:
   crypto: ^3.0.6
 
   # Routing
-  go_router: ^14.6.2
+  go_router: ^17.2.1
 
   # Lokalizasyon / format
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # Immutable state modeli (GameState, SaveEnvelope)
-  freezed_annotation: ^2.4.4
+  freezed_annotation: ^3.0.0
 
   # Save serialize (docs/save-format.md §1)
   json_annotation: ^4.9.0
 
   # Analytics / Monetization (ayrı runbook ile yapılandırılır)
-  firebase_core: ^3.8.0
-  firebase_analytics: ^11.3.3
-  google_mobile_ads: ^5.3.0
+  firebase_core: ^4.7.0
+  firebase_analytics: ^12.3.0
+  google_mobile_ads: ^8.0.0
   in_app_purchase: ^3.2.0
 
 dev_dependencies:
@@ -114,14 +114,14 @@ dev_dependencies:
 
   # Code generation
   build_runner: ^2.4.13
-  freezed: ^2.5.7
+  freezed: ^3.0.0
   json_serializable: ^6.9.0
-  riverpod_generator: ^2.6.1
+  riverpod_generator: ^4.0.0+1
 
-  # Lint
-  custom_lint: ^0.7.0
-  riverpod_lint: ^2.6.1
-  very_good_analysis: ^7.0.0
+  # Lint (analyzer 7.x uyumu için minimum sürümler)
+  custom_lint: ^0.8.1
+  riverpod_lint: ^3.1.0
+  very_good_analysis: ^10.2.0
 
 flutter:
   uses-material-design: true
@@ -409,7 +409,7 @@ part 'save_envelope.g.dart';
 /// SaveEnvelope şeması — docs/save-format.md §1
 /// TODO: implement GameState alanı — ayrı task
 @freezed
-class SaveEnvelope with _$SaveEnvelope {
+abstract class SaveEnvelope with _$SaveEnvelope {
   const factory SaveEnvelope({
     required int version,
     required String lastSavedAt,
