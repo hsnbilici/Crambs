@@ -18,8 +18,8 @@
 
 ```bash
 # FVM ile pinned Flutter'ı ayarla (scaffold-plan.md §2)
-fvm install 3.27.0
-fvm use 3.27.0
+fvm install 3.41.5
+fvm use 3.41.5
 
 # Bağımlılıkları al
 flutter pub get

@@ -93,7 +93,7 @@ jobs:
       - name: Flutter kurulum
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.41.5'
           channel: 'stable'
           cache: true
 
@@ -141,7 +141,7 @@ jobs:
 
 **Notlar:**
 
-- `subosito/flutter-action@v2` — Flutter resmi action; `flutter-version` pin `3.27.0` (`docs/scaffold-plan.md §2` ile senkron).
+- `subosito/flutter-action@v2` — Flutter resmi action; `flutter-version` pin `3.41.5` (`docs/scaffold-plan.md §2` ile senkron).
 - `cache: true` — pub bağımlılıkları cache'lenir; tekrarlanan çalışmalarda `flutter pub get` süresi düşer.
 - `flutter test --coverage` unit + widget + golden testlerin tamamını tek geçişte çalıştırır ve `coverage/lcov.info` üretir.
 - `scripts/check_coverage.sh` scaffold PR'dan sonraki ayrı PR'da yazılır; placeholder olarak `exit 0` ile başlatılabilir, ardından gerçek threshold kontrolleri eklenir.
@@ -171,7 +171,7 @@ jobs:
       - name: Flutter kurulum
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.41.5'
           channel: 'stable'
           cache: true
 
@@ -209,7 +209,7 @@ jobs:
       - name: Flutter kurulum
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.41.5'
           channel: 'stable'
           cache: true
 
@@ -269,7 +269,7 @@ jobs:
       - name: Flutter kurulum
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.41.5'
           channel: 'stable'
           cache: true
 
@@ -308,7 +308,7 @@ jobs:
       - name: Flutter kurulum
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.41.5'
           channel: 'stable'
           cache: true
 

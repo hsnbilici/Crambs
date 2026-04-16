@@ -29,8 +29,8 @@ Bu doküman **scaffold PR için tek gerçek kaynaktır (single source of truth)*
 | Parametre | Değer |
 |---|---|
 | Flutter kanalı | stable |
-| Flutter versiyonu | 3.27.x (FVM ile pin: `fvm use 3.27.0`) |
-| Dart versiyonu | 3.6.x (Flutter 3.27 ile birlikte gelir) |
+| Flutter versiyonu | 3.41.x (FVM ile pin: `fvm use 3.41.5`) |
+| Dart versiyonu | 3.11.x (Flutter 3.41 ile birlikte gelir) |
 | iOS minimum | 13.0 (Flutter min) |
 | Android minimum | API 21 (SDK min) |
 | Cihaz desteği | Fiziksel cihaz + emülatör/simülatör |
@@ -39,19 +39,19 @@ Bu doküman **scaffold PR için tek gerçek kaynaktır (single source of truth)*
 
 ```bash
 # FVM kuruluysa
-fvm use 3.27.0
+fvm use 3.41.5
 fvm flutter --version
 
 # FVM yoksa doğrudan
 flutter --version
-# "Flutter 3.27.x • channel stable" çıktısı beklenir
+# "Flutter 3.41.x • channel stable" çıktısı beklenir
 ```
 
 Repo kökünde `.fvm/fvm_config.json` eklenir:
 
 ```json
 {
-  "flutterSdkVersion": "3.27.0"
+  "flutterSdkVersion": "3.41.5"
 }
 ```
 
@@ -69,7 +69,7 @@ version: 0.1.0+1
 
 environment:
   sdk: ^3.8.0
-  flutter: ">=3.27.0"
+  flutter: ">=3.41.5"
 
 dependencies:
   flutter:

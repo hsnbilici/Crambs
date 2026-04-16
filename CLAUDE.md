@@ -29,10 +29,10 @@ Stack değişimi PRD §16.8 kapsamında **riskli değişiklik** — tek task'ta 
 Flutter stack'i için standart komutlar. Scaffold PR'ında `pubspec.yaml` ve `analysis_options.yaml` eklendikten sonra tümü çalışır hale gelir.
 
 ```bash
-# FVM (Flutter Version Manager) — pinned 3.27.0 .fvm/fvm_config.json
+# FVM (Flutter Version Manager) — pinned 3.41.5 .fvm/fvm_config.json
 # Local Flutter pin'den farklıysa build_runner uyumsuzluk verir.
-fvm install 3.27.0
-fvm use 3.27.0
+fvm install 3.41.5
+fvm use 3.41.5
 
 # Kurulum
 flutter pub get
@@ -210,7 +210,7 @@ Yanlış uygulanması kolay olan noktalar:
 - **Ekranda aynı anda en fazla 3 aktif öneri** (§6.1). UI kalabalığı yasak.
 - **Premium bina, sert paywall, progression'ı bozan IAP YOK** (§8.9).
 - **Codegen sırası sabittir:** `pub get` → `dart run build_runner build` → `flutter analyze` → `flutter test`. Fresh clone'da codegen öncesi `flutter analyze` `uri_does_not_exist` verir — panik yok, build_runner'ı çalıştır.
-- **FVM pin uyarısı:** `.fvm/fvm_config.json` 3.27.0 pinli. Local Flutter 3.41+ kullanılırsa `custom_lint ^0.7.0` / `riverpod_lint ^2.6.1` ile uyumsuzluk doğar (build_runner compile hatası). FVM ile pin'e geç: `fvm use 3.27.0`.
+- **FVM pin uyarısı:** `.fvm/fvm_config.json` 3.41.5 pinli (Dart 3.11 bundle). Pubspec `sdk: ^3.8.0` istediği için daha eski Flutter (3.27 vs) reddedilir. FVM ile pin'e geç: `fvm use 3.41.5`.
 
 ## 13. Açık sorulara alınan kararlar (PRD §19)
 Tüm sorular 2026-04-16 tarihinde karara bağlandı. Sayısal değerler playtest sonrası ayarlanabilir; `docs/economy.md §11` tek parametre kaynağıdır.
