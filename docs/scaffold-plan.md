@@ -145,7 +145,6 @@ analyzer:
     - custom_lint
   errors:
     missing_required_param: error
-    missing_return: error
     invalid_annotation_target: ignore
   exclude:
     - "**/*.g.dart"
@@ -154,10 +153,8 @@ analyzer:
 
 linter:
   rules:
-    # Proje özeline geçersiz kılmalar
+    # very_good_analysis varsayılanlarından projeye özel sapmalar
     public_member_api_docs: false  # mobil uygulama, kütüphane değil
-    prefer_const_constructors: true
-    use_build_context_synchronously: true
 ```
 
 ---
