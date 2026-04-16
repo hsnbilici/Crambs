@@ -43,3 +43,8 @@ build/
 
 # Coverage
 coverage/
+
+# Flutter lockfile (local Flutter 3.41 vs pinned 3.27 sürüm farkı nedeniyle
+# geçici; FVM + 3.27.0 kurulunca bu satır kaldırılacak ve pubspec.lock
+# commit edilecek)
+pubspec.lock
