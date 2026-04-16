@@ -1,0 +1,83 @@
+name: Nightly Integration Tests
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # UTC 03:00 = TR 06:00
+  workflow_dispatch: {}     # Manuel tetikleme (debug için)
+
+jobs:
+  integration_android:
+    name: Integration — Android Emülatör
+    runs-on: macos-latest   # Android emülatör hardware accel için macOS tercih edilir
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter kurulum
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+
+      - name: Kod üretimi
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Android emülatör başlat ve integration test çalıştır
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          script: flutter test integration_test/
+
+      - name: Hata bildirimi
+        if: failure()
+        # Slack webhook: SLACK_WEBHOOK_URL secret'ı ayarlandığında aktif edilir.
+        # Şimdilik log'a yazar; gerçek webhook scaffold sonrası ayrı PR'da eklenir.
+        run: |
+          echo "::error::Nightly Android integration testleri başarısız."
+          echo "Bildirim kanalı henüz yapılandırılmadı — SLACK_WEBHOOK_URL secret eklendiğinde aktif edilecek."
+
+  integration_ios:
+    name: Integration — iOS Simülatör
+    runs-on: macos-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter kurulum
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+
+      - name: Kod üretimi
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: iOS simülatör başlat
+        run: |
+          xcrun simctl list devices available
+          xcrun simctl boot "iPhone 15" || true
+          # Simülatörün boot tamamlaması için kısa bekleme
+          sleep 10
+
+      - name: Integration testleri çalıştır
+        run: flutter test integration_test/ -d "iPhone 15"
+
+      - name: Hata bildirimi
+        if: failure()
+        run: |
+          echo "::error::Nightly iOS integration testleri başarısız."
+          echo "Bildirim kanalı henüz yapılandırılmadı — SLACK_WEBHOOK_URL secret eklendiğinde aktif edilecek."

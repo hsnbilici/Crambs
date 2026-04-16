@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  analyze_test:
+    name: Analyze + Unit + Widget + Golden + Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter kurulum
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+
+      - name: Kod üretimi (build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Statik analiz
+        # docs/test-plan.md §10.1 — sıfır hata, sıfır uyarı zorunlu
+        run: flutter analyze
+
+      - name: Unit + Widget + Golden testleri
+        run: flutter test --coverage
+
+      - name: lcov kurulum
+        run: sudo apt-get install -y lcov
+
+      - name: Coverage özeti
+        run: lcov --summary coverage/lcov.info
+
+      - name: Coverage gate
+        # docs/test-plan.md §5 per-modül hedefleri:
+        #   lib/core/economy/    → satır %95+, dal %90+
+        #   lib/core/save/       → satır %95+, dal %90+
+        #   lib/core/progression → satır %90+, dal %85+
+        #   lib/core/events/     → satır %85+, dal %80+
+        #   lib/features/*       → satır %70+
+        # Detaylı per-modül kontrol scripts/check_coverage.sh'de (ayrı PR'da yazılır)
+        run: bash scripts/check_coverage.sh
+
+      - name: Coverage artifact yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+      - name: Golden snapshot diff kontrolü
+        # Golden testler --coverage çalışmasında zaten koşar.
+        # Tag ile izole etmek gerekirse: flutter test --tags=golden
+        run: echo "Golden testleri analyze_test adımında kapsandı"

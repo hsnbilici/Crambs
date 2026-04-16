@@ -1,0 +1,50 @@
+# Claude Code local state
+.claude/
+
+# macOS
+.DS_Store
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Generated — build_runner çıktıları Git'e eklenmez (CLAUDE.md §3)
+*.g.dart
+*.freezed.dart
+
+# iOS
+**/Pods/
+**/Podfile.lock
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+
+# Android
+**/android/.gradle/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# FVM
+.fvm/flutter_sdk
+
+# Env
+.env
+.env.local
+
+# Coverage
+coverage/
+
+# Flutter lockfile (local Flutter 3.41 vs pinned 3.27 sürüm farkı nedeniyle
+# geçici; FVM + 3.27.0 kurulunca bu satır kaldırılacak ve pubspec.lock
+# commit edilecek)
+pubspec.lock
