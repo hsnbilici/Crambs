@@ -26,7 +26,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Android emülatör başlat ve integration test çalıştır
         uses: reactivecircus/android-emulator-runner@v2
@@ -64,7 +64,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: iOS simülatör başlat
         run: |

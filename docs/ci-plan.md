@@ -101,7 +101,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi (build_runner)
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Statik analiz
         # docs/test-plan.md §10.1 — sıfır hata, sıfır uyarı zorunlu
@@ -179,7 +179,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Android emülatör başlat ve integration test çalıştır
         uses: reactivecircus/android-emulator-runner@v2
@@ -217,7 +217,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: iOS simülatör başlat
         run: |
@@ -277,7 +277,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Android release APK build
         # Keystore imzalaması post-MVP'de eklenir (ANDROID_KEYSTORE_BASE64 secret ile).
@@ -316,7 +316,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: iOS release build (imzasız)
         # --no-codesign: Apple sertifikası ve provisioning profile gerekmez.

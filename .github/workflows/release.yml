@@ -27,7 +27,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Android release APK build
         # Keystore imzalaması post-MVP'de eklenir (ANDROID_KEYSTORE_BASE64 secret ile).
@@ -66,7 +66,7 @@ jobs:
         run: flutter pub get
 
       - name: Kod üretimi
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: iOS release build (imzasız)
         # --no-codesign: Apple sertifikası ve provisioning profile gerekmez.
