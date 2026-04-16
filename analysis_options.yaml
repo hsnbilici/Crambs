@@ -15,3 +15,5 @@ linter:
   rules:
     # very_good_analysis varsayılanlarından projeye özel sapmalar
     public_member_api_docs: false  # mobil uygulama, kütüphane değil
+    flutter_style_todos: false     # TODO'lar doc section ref veriyor, owner YOK
+    sort_pub_dependencies: false   # pubspec semantik gruplama (state/save/routing)

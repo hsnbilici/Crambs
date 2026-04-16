@@ -1,5 +1,6 @@
 /// Uygulama başlatma — Firebase ve diğer SDK'ların sıralı init'i.
-/// TODO: Firebase.initializeApp() — ayrı PR (flutterfire configure + CLAUDE.md §2 SDK listesi).
+/// TODO: Firebase.initializeApp() — ayrı PR
+/// (flutterfire configure + CLAUDE.md §2 SDK listesi).
 class AppBootstrap {
   AppBootstrap._();
 
