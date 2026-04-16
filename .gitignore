@@ -4,7 +4,7 @@
 # macOS
 .DS_Store
 
-# Flutter / Dart (scaffold PR sonrası geçerli)
+# Flutter
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -12,6 +12,34 @@
 .pub-cache/
 .pub/
 build/
-coverage/
-*.iml
+
+# Generated — build_runner çıktıları Git'e eklenmez (CLAUDE.md §3)
+*.g.dart
+*.freezed.dart
+
+# iOS
+**/Pods/
+**/Podfile.lock
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+
+# Android
+**/android/.gradle/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+
+# IDE
 .idea/
+.vscode/
+*.iml
+
+# FVM
+.fvm/flutter_sdk
+
+# Env
+.env
+.env.local
+
+# Coverage
+coverage/
