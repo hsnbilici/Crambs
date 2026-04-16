@@ -17,13 +17,24 @@
 ## Hızlı Başlangıç
 
 ```bash
-# Scaffold sonrası eklenecek
-# flutter pub get
-# flutter run
-# flutter test
+# FVM ile pinned Flutter'ı ayarla (scaffold-plan.md §2)
+fvm install 3.27.0
+fvm use 3.27.0
+
+# Bağımlılıkları al
+flutter pub get
+
+# Kod üretimi (freezed, json_serializable, riverpod_generator)
+dart run build_runner build --delete-conflicting-outputs
+
+# Çalıştır
+flutter run
+
+# Test
+flutter test
 ```
 
-Komut detayları `CLAUDE.md §3` bölümündedir; scaffold PR'ı sonrasında blok çalışır hale gelir.
+Komut detayları `CLAUDE.md §3` bölümündedir.
 
 ## Dokümantasyon Haritası
 
