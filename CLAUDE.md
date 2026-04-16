@@ -14,11 +14,14 @@ MVP çekirdeği: tap loop → 8 bina → 30-40 upgrade → 12 research node → 
 
 Gerekçe: Idle oyun için yeterli performans, düşük öğrenme eğrisi, native bridge karmaşıklığı yok. Unity overkill, React Native'in game tick performans riski var.
 
-Hâlâ karar bekleyen alt bileşenler (first PR'larda seçilecek):
-- State management: Riverpod / BLoC / signals — ilk tercih: **Riverpod** (kolay test edilebilir, family/provider yapısı unlock ağacına uyar).
-- Save persist: `path_provider` + JSON dosyası MVP için yeterli; büyürse Hive/Isar değerlendirilir.
-- Test: `flutter_test` (unit + widget) + `integration_test`.
-- Analytics / Ads / IAP: `firebase_analytics`, `google_mobile_ads`, `in_app_purchase`.
+Sabitlenen alt bileşenler (scaffold PR sonrası `pubspec.yaml` tek gerçek kaynaktır):
+- **State management:** Riverpod 2.6 (+ `riverpod_annotation`, `riverpod_generator`, `riverpod_lint`).
+- **Save persist:** `path_provider` + JSON dosyası; `crypto` paketiyle SaveEnvelope SHA-256 checksum.
+- **Routing:** `go_router` 14.6.
+- **Immutable state:** `freezed` + `json_serializable` (build_runner ile üretilir).
+- **Test:** `flutter_test` (unit + widget) + `integration_test` + `mocktail`.
+- **Analytics / Ads / IAP:** `firebase_analytics`, `google_mobile_ads`, `in_app_purchase` — paket eklendi; `flutterfire configure` ayrı runbook.
+- **Lint:** `very_good_analysis` 7.0 + `custom_lint` plugin.
 
 Stack değişimi PRD §16.8 kapsamında **riskli değişiklik** — tek task'ta yapılmaz.
 
@@ -26,6 +29,11 @@ Stack değişimi PRD §16.8 kapsamında **riskli değişiklik** — tek task'ta 
 Flutter stack'i için standart komutlar. Scaffold PR'ında `pubspec.yaml` ve `analysis_options.yaml` eklendikten sonra tümü çalışır hale gelir.
 
 ```bash
+# FVM (Flutter Version Manager) — pinned 3.27.0 .fvm/fvm_config.json
+# Local Flutter pin'den farklıysa build_runner uyumsuzluk verir.
+fvm install 3.27.0
+fvm use 3.27.0
+
 # Kurulum
 flutter pub get
 
@@ -48,6 +56,11 @@ flutter test integration_test/
 # Golden snapshot güncelleme
 flutter test --update-goldens
 
+# Kod üretimi — freezed, json_serializable, riverpod_generator
+# ÖNEMLİ: analyze/test'ten ÖNCE çalışır; part 'X.g.dart' direktifleri
+# bu adım çalışmadan resolve olmaz.
+dart run build_runner build --delete-conflicting-outputs
+
 # Statik analiz (lint + typecheck — Dart tek geçişte yapar)
 flutter analyze
 
@@ -56,7 +69,7 @@ flutter build ios --release
 flutter build apk --release
 ```
 
-> CI platformu TBD — scaffold PR merge edildiğinde `docs/test-plan.md §10.1` ile senkron güncellenir.
+> **CI:** GitHub Actions — şablonlar `.github/workflows/{ci,nightly,release}.yml`; spec `docs/ci-plan.md`. `docs/test-plan.md §10.1` coverage gate ile senkron.
 
 ## 4. Repo sözleşmesi
 
@@ -70,7 +83,7 @@ flutter build apk --release
 - `docs/telemetry.md` ✓
 - `docs/save-format.md` ✓
 
-**Ek operasyonel dokümanlar** (post-docs derinleştirme, scaffold öncesi):
+**Ek operasyonel dokümanlar** (scaffold PR girdileri — scaffold tamamlandı):
 - `docs/research-tree.md` ✓ — 12 MVP research node'u tam katalog
 - `docs/upgrade-catalog.md` ✓ — 36 MVP upgrade listesi (6 etki tipi)
 - `docs/scaffold-plan.md` ✓ — Flutter scaffold blueprint (pubspec, lib/ iskelet, stub içerikleri)
@@ -196,6 +209,8 @@ Yanlış uygulanması kolay olan noktalar:
 - **Session recap MVP kapsamındadır** (§6.9). Post-MVP'ye atılamaz.
 - **Ekranda aynı anda en fazla 3 aktif öneri** (§6.1). UI kalabalığı yasak.
 - **Premium bina, sert paywall, progression'ı bozan IAP YOK** (§8.9).
+- **Codegen sırası sabittir:** `pub get` → `dart run build_runner build` → `flutter analyze` → `flutter test`. Fresh clone'da codegen öncesi `flutter analyze` `uri_does_not_exist` verir — panik yok, build_runner'ı çalıştır.
+- **FVM pin uyarısı:** `.fvm/fvm_config.json` 3.27.0 pinli. Local Flutter 3.41+ kullanılırsa `custom_lint ^0.7.0` / `riverpod_lint ^2.6.1` ile uyumsuzluk doğar (build_runner compile hatası). FVM ile pin'e geç: `fvm use 3.27.0`.
 
 ## 13. Açık sorulara alınan kararlar (PRD §19)
 Tüm sorular 2026-04-16 tarihinde karara bağlandı. Sayısal değerler playtest sonrası ayarlanabilir; `docs/economy.md §11` tek parametre kaynağıdır.
