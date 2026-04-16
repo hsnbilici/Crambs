@@ -1,0 +1,81 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch: {}     # Manuel tetikleme (test için)
+
+jobs:
+  build_android:
+    name: Android APK + AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter kurulum
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+
+      - name: Kod üretimi
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Android release APK build
+        # Keystore imzalaması post-MVP'de eklenir (ANDROID_KEYSTORE_BASE64 secret ile).
+        # Şimdilik debug keystore ile release build — dağıtım için yeterli değil, artifact doğrulama için yeterli.
+        run: flutter build apk --release
+
+      - name: Android release AAB build
+        run: flutter build appbundle --release
+
+      - name: Android artifact yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ github.ref_name }}
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+  build_ios:
+    name: iOS IPA (imzasız)
+    runs-on: macos-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter kurulum
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+
+      - name: Kod üretimi
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: iOS release build (imzasız)
+        # --no-codesign: Apple sertifikası ve provisioning profile gerekmez.
+        # Gerçek TestFlight dağıtımı post-MVP'de Codemagic veya Fastlane ile eklenir.
+        run: flutter build ios --release --no-codesign
+
+      - name: iOS artifact yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-${{ github.ref_name }}
+          path: build/ios/iphoneos/Runner.app
+          retention-days: 30
