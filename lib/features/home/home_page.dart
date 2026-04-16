@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Ana oyun ekranı — boş scaffold.
-/// TODO: implement per docs/ux-flows.md §1
+/// TODO: implement per docs/ux-flows.md §5.1
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Settings ekranı — boş scaffold.
-/// TODO: implement per docs/ux-flows.md §8
+/// TODO: implement per docs/ux-flows.md §5.8
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Shop ekranı — boş scaffold.
-/// TODO: implement per docs/ux-flows.md §2
+/// TODO: implement per docs/ux-flows.md §5.2
 class ShopPage extends StatelessWidget {
   const ShopPage({super.key});
 

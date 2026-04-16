@@ -334,7 +334,7 @@ abstract class Routes {
 import 'package:flutter/material.dart';
 
 /// Ana oyun ekranı — boş scaffold.
-/// TODO: implement per docs/ux-flows.md §1
+/// TODO: implement per docs/ux-flows.md §5.1
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -369,13 +369,13 @@ class HomeController extends _$HomeController {
 
 Aşağıdaki dosyalar aynı minimal yapıyı izler (yorum değiştirilir):
 
-- `lib/features/shop/shop_page.dart` — `// TODO: implement per docs/ux-flows.md §2`
+- `lib/features/shop/shop_page.dart` — `// TODO: implement per docs/ux-flows.md §5.2`
 - `lib/features/shop/shop_controller.dart`
 - `lib/features/upgrades/upgrades_page.dart` — `// TODO: implement per docs/upgrade-catalog.md`
 - `lib/features/research/research_page.dart` — `// TODO: implement per docs/research-tree.md`
 - `lib/features/prestige/prestige_page.dart` — `// TODO: implement per docs/economy.md §9`
-- `lib/features/achievements/achievements_page.dart`
-- `lib/features/settings/settings_page.dart`
+- `lib/features/achievements/achievements_page.dart` — `// TODO: implement per docs/ux-flows.md §5.7`
+- `lib/features/settings/settings_page.dart` — `// TODO: implement per docs/ux-flows.md §5.8`
 - `lib/features/session_recap/session_recap_modal.dart` — `// TODO: implement per docs/ux-flows.md §6`
 
 ### `lib/core/economy/cost_curve.dart`

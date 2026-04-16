@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Achievements ekranı — boş scaffold.
-/// TODO: implement per docs/ux-flows.md §7
+/// TODO: implement per docs/ux-flows.md §5.7
 class AchievementsPage extends StatelessWidget {
   const AchievementsPage({super.key});
 
