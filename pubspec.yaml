@@ -39,6 +39,13 @@ dependencies:
   google_mobile_ads: ^8.0.0
   in_app_purchase: ^3.2.0
 
+  # Sprint A — polish + onboarding + telemetry foundation
+  flutter_animate: ^4.5.2
+  shared_preferences: ^2.3.4
+  uuid: ^4.5.1
+  flutter_localizations:
+    sdk: flutter
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -61,5 +68,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
   assets:
     - assets/
