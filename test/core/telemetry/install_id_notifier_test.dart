@@ -73,12 +73,15 @@ void main() {
       });
       final c = buildContainer();
       await c.read(installIdProvider.notifier).ensureLoaded();
-      expect(resolveInstallIdForTelemetry(c), 'loaded-id');
+      expect(
+        resolveInstallIdForTelemetry(c.read(installIdProvider)),
+        'loaded-id',
+      );
     });
 
     test('resolveInstallIdForTelemetry returns sentinel when null', () {
       final c = buildContainer();
-      expect(resolveInstallIdForTelemetry(c),
+      expect(resolveInstallIdForTelemetry(c.read(installIdProvider)),
           InstallIdNotifier.kNotLoadedSentinel);
       expect(InstallIdNotifier.kNotLoadedSentinel, '<not-loaded>');
     });

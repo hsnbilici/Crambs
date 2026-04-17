@@ -3,8 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Install ID'nin tek kaynağı (SharedPreferences).
 /// Boot: ensureLoaded() → adoptFromGameState(gs.meta.installId) (disk wins).
-/// Telemetry payload için `resolveInstallIdForTelemetry(ref)` kullan —
-/// null ise `<not-loaded>` sentinel döner (invariant guard).
+/// Telemetry payload için:
+///   `resolveInstallIdForTelemetry(ref.read(installIdProvider))`
+/// şeklinde çağır — null ise `<not-loaded>` sentinel döner (invariant I1).
 class InstallIdNotifier extends Notifier<String?> {
   static const _prefKey = 'crumbs.install_id';
   static const kNotLoadedSentinel = '<not-loaded>';
@@ -36,12 +37,16 @@ final installIdProvider =
     NotifierProvider<InstallIdNotifier, String?>(InstallIdNotifier.new);
 
 /// Telemetry invariant guard.
-/// Returns install_id veya `<not-loaded>` sentinel.
-/// Integration test bu sentinel'ı production emission'da görürse fail eder.
+/// Maps a raw install_id value (from `Ref.read(installIdProvider)`,
+/// `WidgetRef.read(installIdProvider)`, or
+/// `ProviderContainer.read(installIdProvider)`)
+/// to either the loaded String or the `<not-loaded>` sentinel.
 ///
-/// Hem [ProviderContainer] (test/boot) hem de production context'te
-/// `container.read(installIdProvider)` aynı API'yı kullanır.
-String resolveInstallIdForTelemetry(ProviderContainer container) {
-  return container.read(installIdProvider) ??
-      InstallIdNotifier.kNotLoadedSentinel;
+/// Caller is responsible for the `.read()` — this keeps the helper
+/// compatible with all three Riverpod 3.1 read contexts.
+///
+/// Integration test: if this sentinel appears in production emission,
+/// test fails (invariant I1).
+String resolveInstallIdForTelemetry(String? rawValue) {
+  return rawValue ?? InstallIdNotifier.kNotLoadedSentinel;
 }
