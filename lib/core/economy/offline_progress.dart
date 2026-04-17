@@ -12,7 +12,11 @@ class OfflineProgress {
   /// B'de Duration(hours: 12). Tek satır const değişim.
   static const Duration _kOfflineCap = Duration(hours: 24);
 
-  static OfflineReport compute(GameState state, DateTime now) {
+  static OfflineReport compute(
+    GameState state,
+    DateTime now, {
+    double globalMultiplier = 1.0,
+  }) {
     final last = DateTime.parse(state.meta.lastSavedAt);
     final rawElapsed = now.difference(last);
     final capped = rawElapsed > _kOfflineCap;
@@ -20,6 +24,7 @@ class OfflineProgress {
     final earned = Production.tickDelta(
       state.buildings.owned,
       effective.inMicroseconds / 1e6,
+      globalMultiplier: globalMultiplier,
     );
     return OfflineReport(
       earned: earned,
