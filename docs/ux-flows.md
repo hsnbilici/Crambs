@@ -546,49 +546,28 @@ Detaylı akış için §6'ya bakınız.
 
 ---
 
-## 6. Session Recap Modal — Detaylı Akış
+## §6. Tutorial (FR-3 — 3 step, route-aware Step 2)
 
-### 6.1 Trigger Koşulu
+1. **Step 1 — tapCupcake** (HomePage)
+   - Cupcake üzerinde pulse halo + "Crumb kazanmak için cupcake'e dokun!"
+   - Skip seçeneği: "Geç" → tutorial tamamen atlanır (all-or-nothing)
+   - Advance: ilk tap (`GameState.inventory.r1Crumbs` delta > 0 — fresh install'da 0 building olduğu için yalnız user tap tetikler)
 
-| Koşul | Değer |
-|-------|-------|
-| Kaynak alanı | `RunState.lastActiveAt` (PRD §7.3) |
-| Eşik | `now - lastActiveAt > 60 sn` |
-| Gösterim zamanı | Home ekranı yüklendikten sonra, modal üstüne modal kuralı ihlal edilmeden |
-| Oturum başına gösterim | Tek seferlik; aynı cold start'ta ikinci kez gösterilmez |
+2. **Step 2 — openShop** (route-aware, tek enum)
+   - Home'da iken: BottomNav "Dükkân" item'ı üstünde `BottomNavCallout` ("Dükkân'a git ve ilk üreticini al")
+   - ShopPage'e geçince (`/shop`): ilk building row (crumb_collector) üzerinde `CoachMarkOverlay` ("Crumb Collector'ı satın al")
+   - Advance: ilk binaya sahip olunca (`GameState.buildings.owned['crumb_collector']` artışı)
+   - NOT: "shop'a git" vs "binayı al" granularity'si B3'e ertelendi (tutorial funnel analytics için gerekirse split)
 
-### 6.2 Akış Adımları
+3. **Step 3 — explainCrumbs** (ShopPage)
+   - Bottom-centered `InfoCardOverlay` + modal barrier (background taps bloklanır)
+   - Title: "Neden Crumb kazanıyorsun?"
+   - Body: Binalar otomatik üretim mekanizması açıklaması
+   - CTA: "Anladım" → `tutorialCompleted=true`, `TutorialCompleted` event emit
 
-1. Uygulama ön plana gelir → `session_start` gönderilir (`telemetry.md §4.1`)
-2. `lastActiveAt` değeri okunur; 60 sn eşiği aşılmışsa modal hazırlanır
-3. Home ekranı arka planda yüklenir (save okunur, production tick çalışır)
-4. Modal açılır → `session_recap_shown` event gönderilir (`offline_duration_ms`, `resource_earned_offline` — `telemetry.md §4.7`)
-5. Kaynak sayaç animasyonu çalışır — **maksimum 1,5 sn** (animasyon tamamlanmadan CTA'lar aktif olmayabilir; kullanıcı beklemeden kapatabilir)
-6. Modal içeriği gösterilir:
-   - "X Crumbs üretildi" (yokken üretilen)
-   - "En çok katkı: [Bina Adı]"
-   - Pasif çarpan değeri
-   - En verimli 3 aksiyon önerisi (buton veya kart)
-   - Yeni özellik unlock varsa "Yeni: [özellik adı]" bandı
-7. Oyuncu seçim yapar:
+**Flicker guard [I11]:** `TutorialNotifier extends AsyncNotifier<TutorialState>`; `build()` SharedPreferences hydrate'ten önce overlay render edilmez (`tutorialActiveProvider.maybeWhen(data: ..., orElse: () => false)`).
 
-| Aksiyon | Davranış | Telemetri (`telemetry.md §4.7`) |
-|---------|----------|----------------------------------|
-| "Topla" (Collect) | Modal kapanır, Home'daki sayaç güncellenir | `session_recap_action_taken` → `action_type: "collect"` (bkz. `docs/telemetry.md §4.7`) |
-| "Aksiyona Geç" (Take Action — önerilerden birine tap) | Modal kapanır, ilgili ekrana yönlendirilir | `session_recap_action_taken` → `action_type: "buy_building"` / `"buy_upgrade"` / `"open_shop"` |
-| "Kapat" (Dismiss — X veya dışarıya tap) | Modal kapanır, Home'da kalır | `session_recap_dismissed` |
-
-8. Modal kapandıktan sonra Home ekranı güncellenmiş kaynakla gösterilir
-
-### 6.3 Erişilebilirlik
-
-| Konu | Kural |
-|------|-------|
-| Screen reader | Modal platform erişilebilirlik katmanına (iOS VoiceOver, Android TalkBack) dahil edilir; başlık, içerik ve her CTA butonu ayrı semantic node olarak tanımlanır |
-| Focus yönetimi | Modal açılınca focus otomatik olarak modal başlığına taşınır; kapanınca önceki focus noktasına döner |
-| Animasyon | `prefers-reduced-motion` / low-motion mode aktifse sayaç animasyonu atlanır, son değer doğrudan gösterilir |
-| Renk | Önerilen aksiyonlar renk + ikon + metin üçlüsüyle gösterilir |
-| Dokunma hedefi | Her CTA butonu ≥44×44 pt |
+**Mount kontratı [I12]:** `TutorialScaffold` MUTLAKA `MaterialApp.router(builder: ...)` üzerinden mount edilir. Router tree context olmadan `GoRouterState.of(context)` fail eder (route-aware Step 2 çalışmaz).
 
 ---
 
