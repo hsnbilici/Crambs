@@ -9,8 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 /// Cold/warm/pause session geçişlerini yöneten controller.
-/// - onLaunch(firstLaunchMarkedBefore: true) → AppInstall + SessionStart
-/// - onLaunch(firstLaunchMarkedBefore: false) → SessionStart only
+/// - onLaunch(isFirstLaunch: true) → AppInstall + SessionStart
+/// - onLaunch(isFirstLaunch: false) → SessionStart only
 /// - onResume() → yeni SessionStart (yeni session_id)
 /// - onPause() → SessionEnd (durationMs hesabıyla)
 ///
@@ -24,10 +24,14 @@ class SessionController {
 
   TelemetryLogger get _logger => _ref.read(telemetryLoggerProvider);
 
-  void onLaunch({required bool firstLaunchMarkedBefore}) {
+  /// [isFirstLaunch]: true when this is the user's first session ever
+  /// (no `firstLaunchMarked` pref yet). Bootstrap computes it as
+  /// `!tutorialState.firstLaunchMarked`. When true, emits AppInstall +
+  /// SessionStart; otherwise emits SessionStart only.
+  void onLaunch({required bool isFirstLaunch}) {
     final installId =
         resolveInstallIdForTelemetry(_ref.read(installIdProvider));
-    if (firstLaunchMarkedBefore) {
+    if (isFirstLaunch) {
       _logger.log(AppInstall(
         installId: installId,
         platform: Platform.operatingSystem,

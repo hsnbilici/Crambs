@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///   c. gameStateNotifierProvider.future (hydrate + migration)
 ///   d. installIdProvider.adoptFromGameState(gs.meta.installId) [disk wins]
 ///   e. tutorialNotifierProvider.future (hydrate; flicker guard \[I11\])
-///   f. sessionController.onLaunch(firstLaunchMarkedBefore)
+///   f. sessionController.onLaunch(isFirstLaunch)
 class AppBootstrap {
   const AppBootstrap._();
 
@@ -36,10 +36,10 @@ class AppBootstrap {
     final tutorialState =
         await container.read(tutorialNotifierProvider.future);
 
-    final firstLaunchBefore = !tutorialState.firstLaunchMarked;
+    final isFirstLaunch = !tutorialState.firstLaunchMarked;
     container
         .read(sessionControllerProvider)
-        .onLaunch(firstLaunchMarkedBefore: firstLaunchBefore);
+        .onLaunch(isFirstLaunch: isFirstLaunch);
 
     return BootstrapResult(container: container);
   }

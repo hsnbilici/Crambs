@@ -41,7 +41,7 @@ void main() {
       final firstLaunchBefore = !tutorialState.firstLaunchMarked;
       c
           .read(sessionControllerProvider)
-          .onLaunch(firstLaunchMarkedBefore: firstLaunchBefore);
+          .onLaunch(isFirstLaunch: firstLaunchBefore);
 
       // Mount sim: TutorialScaffold postFrame start()
       await c.read(tutorialNotifierProvider.notifier).start();
@@ -85,7 +85,7 @@ void main() {
       final firstLaunchBefore = !tutorialState.firstLaunchMarked;
       c
           .read(sessionControllerProvider)
-          .onLaunch(firstLaunchMarkedBefore: firstLaunchBefore);
+          .onLaunch(isFirstLaunch: firstLaunchBefore);
 
       await c.read(tutorialNotifierProvider.notifier).start();
 
@@ -109,7 +109,7 @@ void main() {
       await c.read(gameStateNotifierProvider.future);
       c
           .read(sessionControllerProvider)
-          .onLaunch(firstLaunchMarkedBefore: false);
+          .onLaunch(isFirstLaunch: false);
 
       await Future<void>.delayed(const Duration(milliseconds: 30));
       c.read(sessionControllerProvider).onPause();

@@ -43,7 +43,7 @@ void main() {
       final logger = _FakeLogger();
       final c = buildContainer(logger);
       await c.read(installIdProvider.notifier).ensureLoaded();
-      c.read(sessionControllerProvider).onLaunch(firstLaunchMarkedBefore: true);
+      c.read(sessionControllerProvider).onLaunch(isFirstLaunch: true);
 
       expect(logger.events, hasLength(2));
       expect(logger.events[0], isA<AppInstall>());
@@ -57,7 +57,7 @@ void main() {
       await c.read(installIdProvider.notifier).ensureLoaded();
       c
           .read(sessionControllerProvider)
-          .onLaunch(firstLaunchMarkedBefore: false);
+          .onLaunch(isFirstLaunch: false);
 
       expect(logger.events, hasLength(1));
       expect(logger.events.single, isA<SessionStart>());
@@ -69,7 +69,7 @@ void main() {
       await c.read(installIdProvider.notifier).ensureLoaded();
       c
           .read(sessionControllerProvider)
-          .onLaunch(firstLaunchMarkedBefore: false);
+          .onLaunch(isFirstLaunch: false);
 
       final start = logger.events.single as SessionStart;
       expect(start.installId, 'test-id');
@@ -85,7 +85,7 @@ void main() {
       final controller = c.read(sessionControllerProvider);
       // Cascade not possible: await separates onLaunch and onPause.
       // ignore: cascade_invocations
-      controller.onLaunch(firstLaunchMarkedBefore: false);
+      controller.onLaunch(isFirstLaunch: false);
 
       await Future<void>.delayed(const Duration(milliseconds: 20));
       controller.onPause();
@@ -113,7 +113,7 @@ void main() {
       final controller = c.read(sessionControllerProvider);
       // Cascade not possible: firstSessionId read intervenes before onResume.
       // ignore: cascade_invocations
-      controller.onLaunch(firstLaunchMarkedBefore: false);
+      controller.onLaunch(isFirstLaunch: false);
       final firstSessionId =
           (logger.events.single as SessionStart).sessionId;
 
@@ -136,7 +136,7 @@ void main() {
       addTearDown(c.dispose);
       c
           .read(sessionControllerProvider)
-          .onLaunch(firstLaunchMarkedBefore: false);
+          .onLaunch(isFirstLaunch: false);
 
       final start = logger.events.single as SessionStart;
       expect(start.installId, '<not-loaded>');

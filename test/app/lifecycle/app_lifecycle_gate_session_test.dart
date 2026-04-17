@@ -48,7 +48,7 @@ void main() {
     await c.read(gameStateNotifierProvider.future);
     c
         .read(sessionControllerProvider)
-        .onLaunch(firstLaunchMarkedBefore: false);
+        .onLaunch(isFirstLaunch: false);
 
     await Future<void>.delayed(const Duration(milliseconds: 30));
     c.read(sessionControllerProvider).onPause();

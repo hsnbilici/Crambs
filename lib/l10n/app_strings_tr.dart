@@ -115,4 +115,26 @@ class AppStringsTr extends AppStrings {
 
   @override
   String get errorScreenRetry => 'Tekrar dene';
+
+  @override
+  String get tutorialStep1Message => 'Crumb kazanmak için cupcake\'e dokun!';
+
+  @override
+  String get tutorialStep2NavMessage => 'Dükkân\'a git ve ilk üreticini al';
+
+  @override
+  String get tutorialStep2ShopMessage => 'Crumb Collector\'ı satın al';
+
+  @override
+  String get tutorialStep3Title => 'Neden Crumb kazanıyorsun?';
+
+  @override
+  String get tutorialStep3Body =>
+      'Binaların otomatik olarak saniyede Crumb üretir. Daha fazla satın al, daha hızlı büyü!';
+
+  @override
+  String get tutorialSkipButton => 'Geç';
+
+  @override
+  String get tutorialCloseButton => 'Anladım';
 }

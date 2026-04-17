@@ -291,6 +291,48 @@ abstract class AppStrings {
   /// In tr, this message translates to:
   /// **'Tekrar dene'**
   String get errorScreenRetry;
+
+  /// No description provided for @tutorialStep1Message.
+  ///
+  /// In tr, this message translates to:
+  /// **'Crumb kazanmak için cupcake\'e dokun!'**
+  String get tutorialStep1Message;
+
+  /// No description provided for @tutorialStep2NavMessage.
+  ///
+  /// In tr, this message translates to:
+  /// **'Dükkân\'a git ve ilk üreticini al'**
+  String get tutorialStep2NavMessage;
+
+  /// No description provided for @tutorialStep2ShopMessage.
+  ///
+  /// In tr, this message translates to:
+  /// **'Crumb Collector\'ı satın al'**
+  String get tutorialStep2ShopMessage;
+
+  /// No description provided for @tutorialStep3Title.
+  ///
+  /// In tr, this message translates to:
+  /// **'Neden Crumb kazanıyorsun?'**
+  String get tutorialStep3Title;
+
+  /// No description provided for @tutorialStep3Body.
+  ///
+  /// In tr, this message translates to:
+  /// **'Binaların otomatik olarak saniyede Crumb üretir. Daha fazla satın al, daha hızlı büyü!'**
+  String get tutorialStep3Body;
+
+  /// No description provided for @tutorialSkipButton.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geç'**
+  String get tutorialSkipButton;
+
+  /// No description provided for @tutorialCloseButton.
+  ///
+  /// In tr, this message translates to:
+  /// **'Anladım'**
+  String get tutorialCloseButton;
 }
 
 class _AppStringsDelegate extends LocalizationsDelegate<AppStrings> {

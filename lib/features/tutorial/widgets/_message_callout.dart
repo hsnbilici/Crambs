@@ -1,3 +1,4 @@
+import 'package:crumbs/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 class MessageCallout extends StatelessWidget {
@@ -38,7 +39,9 @@ class MessageCallout extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: onSkip,
-                    child: const Text('Geç'),
+                    child: Text(
+                      AppStrings.of(context)?.tutorialSkipButton ?? 'Geç',
+                    ),
                   ),
                 ),
               ],
