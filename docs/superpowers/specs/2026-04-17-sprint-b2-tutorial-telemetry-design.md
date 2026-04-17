@@ -96,22 +96,33 @@ lib/core/telemetry/                       [YENİ dizin]
 
 lib/core/tutorial/                        [YENİ dizin]
 ├── tutorial_step.dart                    [YENİ]
-│     └── enum TutorialStep { tapCupcake, openShop, buyFirstBuilding, explainCrumbs }
-│         (4 enum — Step 2 HomePage/Shop transition: openShop → buyFirstBuilding)
+│     └── enum TutorialStep { tapCupcake, openShop, explainCrumbs }
+│         (3 enum — openShop = "navigate to shop + buy first building";
+│          İçindeki UI render'ı GoRouterState.matchedLocation ile belirlenir:
+│            location == '/'     → BottomNavCallout (Dükkân'a git)
+│            location == '/shop' → CoachMarkOverlay (ilk row halo)
+│          Advance trigger: first building purchase (route-agnostic))
 ├── tutorial_state.dart                   [YENİ]
 │     └── freezed TutorialState
 │         ├── firstLaunchMarked: bool
 │         ├── tutorialCompleted: bool
 │         └── currentStep: TutorialStep?
 ├── tutorial_notifier.dart                [YENİ]
-│     └── class TutorialNotifier extends Notifier<TutorialState>
-│         ├── start()          → idempotent, currentStep != null ise no-op
+│     └── class TutorialNotifier extends AsyncNotifier<TutorialState>
+│         ├── build() async → SharedPreferences'tan hydrate + default döner
+│         │                   (Sprint A GameStateNotifier pattern; sync default
+│         │                    yok → flicker race engellenir)
+│         ├── start()          → idempotent, firstLaunchMarked=true ise no-op
 │         ├── advance()        → re-entry guard (expected step verify)
 │         ├── skip()           → all-or-nothing, completed=true
 │         └── complete()       → completed=true
 └── tutorial_providers.dart               [YENİ]
-      └── tutorialNotifierProvider (NotifierProvider<TutorialNotifier, TutorialState>)
-      └── tutorialActiveProvider (Provider<bool>) — !tutorialCompleted
+      └── tutorialNotifierProvider (AsyncNotifierProvider<TutorialNotifier, TutorialState>)
+      └── tutorialActiveProvider (Provider<bool>)
+          → ref.watch(tutorialNotifierProvider).maybeWhen(
+              data: (s) => !s.tutorialCompleted,
+              orElse: () => false, // loading/error → tutorial gizli (flicker yok)
+            )
 
 lib/features/tutorial/                    [YENİ dizin]
 ├── tutorial_scaffold.dart                [YENİ]
@@ -175,8 +186,18 @@ lib/features/shop/widgets/building_row.dart  [modified]
           (parent passed — widget'a key parametresi eklenir)
 
 lib/main.dart                             [modified]
-      └── MaterialApp.builder: TutorialScaffold(child: child)
-          → tüm route'ların üstünde overlay katmanı
+      └── CrumbsApp uses MaterialApp.router(routerConfig: router, ...)
+          → ADD builder parameter:
+            MaterialApp.router(
+              routerConfig: router,
+              builder: (ctx, child) => TutorialScaffold(
+                child: child ?? const SizedBox.shrink(),
+              ),
+              ...
+            )
+          INVARIANT: TutorialScaffold MUST be mounted via MaterialApp.router.builder
+          (router tree context altında). Yukarı taşınırsa GoRouterState.of(context)
+          _buildStep2Overlay içinde fail eder.
 ```
 
 ### 2.3 Test yapısı
@@ -424,64 +445,69 @@ class SessionController {
 ### 4.1 State machine
 
 ```
-TutorialStep enum:
-  tapCupcake        (Step 1)
-  openShop          (Step 2a — HomePage'de BottomNav callout)
-  buyFirstBuilding  (Step 2b — ShopPage'e geçti, first row halo)
-  explainCrumbs     (Step 3 — bottom-sheet info card)
+TutorialStep enum (3):
+  tapCupcake      (Step 1)
+  openShop        (Step 2 — Home'da BottomNav callout; Shop'ta ilk row halo;
+                   route-aware render; tek advance trigger = first building purchase)
+  explainCrumbs   (Step 3 — bottom-sheet info card)
 
 Transitions:
-  (null, !completed) --[TutorialScaffold.postFrame + !firstLaunchMarked]--> tapCupcake
-  tapCupcake        --[GameState.run.totalTaps delta > 0]-->                openShop
-  openShop          --[GoRouter.matchedLocation == '/shop']-->              buyFirstBuilding
-  buyFirstBuilding  --[GameState.buildings.owned['crumb_collector'] > 0]--> explainCrumbs
-  explainCrumbs     --["Anladım" CTA]-->                                    (null, completed=true)
-  <any step>        --["Geç" CTA in Step 1 overlay]-->                      (null, completed=true, skipped=true)
+  (null, !completed) --[TutorialScaffold.postFrame + !firstLaunchMarked]-->   tapCupcake
+  tapCupcake        --[GameState.run.totalTaps delta > 0]-->                  openShop
+  openShop          --[GameState.buildings.owned['crumb_collector'] > 0]-->   explainCrumbs
+  explainCrumbs     --["Anladım" CTA]-->                                      (null, completed=true)
+  <any step>        --["Geç" CTA in Step 1 overlay]-->                        (null, completed=true, skipped=true)
+
+NOT: Step 2'nin "shop'a git" ve "ilk binayı al" 2-state granularity'si B3'e
+ertelendi (tutorial funnel analytics için gerekirse split). B2'de tek enum
++ UI-katmanı route branching.
 ```
 
 ### 4.2 TutorialNotifier
 
 ```dart
-class TutorialNotifier extends Notifier<TutorialState> {
+/// AsyncNotifier pattern — Sprint A GameStateNotifier ile aynı.
+/// Gerekçe: sync build() defaultı + sonradan hydrate() flicker race üretir
+/// (UI completed=false default ile mount, hydrate sonrası completed=true
+/// olarak flip). AsyncNotifier'da build() async → loading state sürecinde
+/// UI tutorial göstermez (tutorialActiveProvider = maybeWhen orElse:false).
+class TutorialNotifier extends AsyncNotifier<TutorialState> {
   static const _prefKeyFirstLaunch = 'crumbs.first_launch_marked';
   static const _prefKeyCompleted = 'crumbs.tutorial_completed';
 
   @override
-  TutorialState build() {
-    // Synchronous build returns a "loading" default; hydrate() called from boot.
-    return const TutorialState(
-      firstLaunchMarked: false,
-      tutorialCompleted: false,
-      currentStep: null,
+  Future<TutorialState> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    return TutorialState(
+      firstLaunchMarked: prefs.getBool(_prefKeyFirstLaunch) ?? false,
+      tutorialCompleted: prefs.getBool(_prefKeyCompleted) ?? false,
+      currentStep: null, // session-only, disk'te tutulmaz
     );
   }
 
-  Future<void> hydrate() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = state.copyWith(
-      firstLaunchMarked: prefs.getBool(_prefKeyFirstLaunch) ?? false,
-      tutorialCompleted: prefs.getBool(_prefKeyCompleted) ?? false,
-    );
-  }
+  TutorialState get _state => state.requireValue;
 
   /// Idempotent. Called from TutorialScaffold postFrameCallback.
   /// No-op if tutorial already active, completed, or not first launch.
   Future<void> start() async {
-    if (state.tutorialCompleted || state.currentStep != null) return;
-    if (state.firstLaunchMarked) return;
+    final current = _state;
+    if (current.tutorialCompleted || current.currentStep != null) return;
+    if (current.firstLaunchMarked) return;
 
-    state = state.copyWith(currentStep: TutorialStep.tapCupcake);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefKeyFirstLaunch, true);
-    state = state.copyWith(firstLaunchMarked: true);
+    state = AsyncData(current.copyWith(
+      firstLaunchMarked: true,
+      currentStep: TutorialStep.tapCupcake,
+    ));
     // TutorialStarted event emit edilir caller (TutorialScaffold) tarafından.
   }
 
   /// Re-entry guard: only advances if currentStep == expected.
   void advance({required TutorialStep from}) {
-    if (state.currentStep != from) return;
-    final next = _nextStep(from);
-    state = state.copyWith(currentStep: next);
+    final current = _state;
+    if (current.currentStep != from) return;
+    state = AsyncData(current.copyWith(currentStep: _nextStep(from)));
   }
 
   Future<void> skip() async {
@@ -495,16 +521,18 @@ class TutorialNotifier extends Notifier<TutorialState> {
   }
 
   Future<void> _markCompleted() async {
-    state = state.copyWith(tutorialCompleted: true, currentStep: null);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefKeyCompleted, true);
+    state = AsyncData(_state.copyWith(
+      tutorialCompleted: true,
+      currentStep: null,
+    ));
   }
 
   TutorialStep? _nextStep(TutorialStep current) {
     return switch (current) {
       TutorialStep.tapCupcake => TutorialStep.openShop,
-      TutorialStep.openShop => TutorialStep.buyFirstBuilding,
-      TutorialStep.buyFirstBuilding => TutorialStep.explainCrumbs,
+      TutorialStep.openShop => TutorialStep.explainCrumbs,
       TutorialStep.explainCrumbs => null,
     };
   }
@@ -621,16 +649,16 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _startInvoked) return;
+      // AsyncNotifier build() tamamlanana kadar bekle — hydrate inline.
+      final loaded = await ref.read(tutorialNotifierProvider.future);
+      if (!mounted || loaded.tutorialCompleted || loaded.firstLaunchMarked) return;
       _startInvoked = true;
-      final notifier = ref.read(tutorialNotifierProvider.notifier);
-      await notifier.hydrate();
-      await notifier.start();
-      final postState = ref.read(tutorialNotifierProvider);
-      if (postState.currentStep == TutorialStep.tapCupcake) {
+      await ref.read(tutorialNotifierProvider.notifier).start();
+      final postState = ref.read(tutorialNotifierProvider).valueOrNull;
+      if (postState?.currentStep == TutorialStep.tapCupcake) {
         _startedAt = DateTime.now();
-        final installId = resolveInstallIdForTelemetry(ref);
         ref.read(telemetryLoggerProvider).log(
-          TutorialStarted(installId: installId),
+          TutorialStarted(installId: resolveInstallIdForTelemetry(ref)),
         );
       }
     });
@@ -638,28 +666,32 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final tutorialState = ref.watch(tutorialNotifierProvider);
+    final asyncState = ref.watch(tutorialNotifierProvider);
 
-    // Step 1 advance trigger: cupcake tap (totalTaps delta)
+    // AsyncNotifier loading/error → tutorial gizli (flicker engeli).
+    final step = asyncState.maybeWhen(
+      data: (s) => s.currentStep,
+      orElse: () => null,
+    );
+
+    // Advance triggers: cupcake tap + first building purchase
     ref.listen<AsyncValue<GameState>>(gameStateNotifierProvider, (prev, next) {
-      final step = tutorialState.currentStep;
       if (step == null) return;
       final prevTaps = prev?.value?.run.totalTaps ?? 0;
       final nextTaps = next.value?.run.totalTaps ?? 0;
       if (step == TutorialStep.tapCupcake && nextTaps > prevTaps) {
         ref.read(tutorialNotifierProvider.notifier).advance(from: step);
       }
-      // Step 2b advance trigger: first building purchase
       final prevOwned = prev?.value?.buildings.owned['crumb_collector'] ?? 0;
       final nextOwned = next.value?.buildings.owned['crumb_collector'] ?? 0;
-      if (step == TutorialStep.buyFirstBuilding && nextOwned > prevOwned) {
+      if (step == TutorialStep.openShop && nextOwned > prevOwned) {
         ref.read(tutorialNotifierProvider.notifier).advance(from: step);
       }
     });
 
     return Stack(children: [
       widget.child,
-      if (tutorialState.currentStep != null) _buildOverlay(tutorialState.currentStep!),
+      if (step != null) _buildOverlay(step),
     ]);
   }
 
@@ -675,7 +707,6 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
         onSkip: () => _onSkipPressed(notifier),
       ),
       TutorialStep.openShop => _buildStep2Overlay(notifier, s),
-      TutorialStep.buyFirstBuilding => _buildStep2Overlay(notifier, s),
       TutorialStep.explainCrumbs => InfoCardOverlay(
         title: s.tutorialStep3Title,
         body: s.tutorialStep3Body,
@@ -738,23 +769,37 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
 | "Anladım" button | Tutorial Step 3 | FilledButton | Verify → OK |
 | Snackbar dismiss | Welcome back | Gesture | OK (N/A) |
 
-**Fix pattern:**
-```dart
-// Before
-FilledButton(onPressed: ..., child: Text('Satın al'))
+**Fix pattern — theme-level (tercih edilen):**
 
-// After
-SizedBox(
-  height: 48,
-  child: FilledButton(
-    style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
-    onPressed: ...,
-    child: Text('Satın al'),
-  ),
-)
+Her call site'a `SizedBox(height: 48)` wrap etmek yerine global `ThemeData` içinde button minimumSize'ı 48dp'ye bağla. Tek satır fix, 3+ widget'ı kapsar, mevcut call site'lara dokunulmaz.
+
+```dart
+// lib/ui/theme/app_theme.dart (mevcut dosyaya ekleme)
+ThemeData buildAppTheme(/* mevcut params */) {
+  return ThemeData(
+    // ... mevcut alanlar
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(48, 48),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        minimumSize: const Size(48, 48),
+      ),
+    ),
+  );
+}
 ```
 
-**Validation:** `flutter test` widget boy ölçümü golden snapshot veya `tester.getSize(find.byType(FilledButton))` assertion (3 call site için smoke test).
+**Kapsadığı widget'lar:**
+- Shop "Satın al" (`FilledButton`)
+- Upgrades "Satın al" (`FilledButton`)
+- ErrorScreen "Tekrar dene" (`FilledButton`)
+- Tutorial Step 1 "Geç" (`TextButton` — explicit 48dp)
+- Tutorial Step 3 "Anladım" (`FilledButton`)
+
+**Validation:** `flutter test` smoke test — 3 call site'ta `tester.getSize(find.byType(FilledButton)).height >= 48`. Theme override test'i `ProviderScope` altında MaterialApp mount ile doğrulanır.
 
 ---
 
@@ -775,14 +820,15 @@ Bu sözleşme `AppLifecycleGate` + `SessionController` + `GameStateNotifier` ent
         .adoptFromGameState(gs.meta.installId)
       → Disk-wins: GameState.meta.installId SharedPreferences'a yazılır (eğer farklıysa)
       → state = savedInstallId
-   e. await container.read(tutorialNotifierProvider.notifier).hydrate()
-      → SharedPreferences'tan firstLaunchMarked + tutorialCompleted okundu
+   e. final tutorialState = await container.read(tutorialNotifierProvider.future)
+      → AsyncNotifier build() tamamlanır (SharedPreferences hydrate inline)
 
-2. firstLaunchMarked değerini hydrate sonrası, start() öncesi capture et:
-   final tutorialState = container.read(tutorialNotifierProvider);
+2. firstLaunchMarked değerini start() öncesi capture et:
    final firstLaunchBefore = !tutorialState.firstLaunchMarked;
    (Not: TutorialNotifier.start() henüz çağrılmadı — step 4'te TutorialScaffold
-    postFrameCallback'i firstLaunchMarked=true olarak flip edecek.)
+    postFrameCallback'i firstLaunchMarked=true olarak flip edecek.
+    INVARIANT: capture noktası ile start()'ın SharedPreferences write'ı
+    arasındaki window hiçbir code path tarafından observe edilmez.)
 
 3. container.read(sessionControllerProvider).onLaunch(
      firstLaunchMarkedBefore: firstLaunchBefore,
@@ -791,9 +837,11 @@ Bu sözleşme `AppLifecycleGate` + `SessionController` + `GameStateNotifier` ent
    → SessionStart event (her zaman)
 
 4. runApp(ProviderScope(...))
-   → MaterialApp.builder içinde TutorialScaffold mount
-   → postFrameCallback → tutorial notifier.start()
-     (eğer !firstLaunchMarked ise currentStep=tapCupcake + TutorialStarted emit)
+   → CrumbsApp.MaterialApp.router(builder: (ctx, child) => TutorialScaffold(child: ...))
+   → TutorialScaffold postFrameCallback:
+     - ref.read(tutorialNotifierProvider.future) bekle (zaten hydrated)
+     - start() çağır (idempotent; !firstLaunchMarked ise currentStep=tapCupcake)
+     - TutorialStarted emit (yalnızca start() gerçekten transition yaptıysa)
 ```
 
 ### 6.2 onResume (hot resume)
@@ -843,7 +891,9 @@ Gerekçe: pause sırasında süreç öldürülürse persist garanti edilmiş olm
 - **[I7]** Chain 3-site invariant B1'den korunur (Sprint B2 değişikliği yok)
 - **[I8]** OfflineReport push kuralı B1'den korunur (cold start only)
 - **[I9]** `installIdProvider` ve `GameState.meta.installId` boot sonrası aynı değeri taşır (disk-wins)
-- **[I10]** `flutter_riverpod` `NotifierProvider` pattern B1'den devralınır; `StateProvider` eklenmez
+- **[I10]** `flutter_riverpod` `NotifierProvider`/`AsyncNotifierProvider` pattern B1'den devralınır; `StateProvider` eklenmez
+- **[I11]** Tutorial flicker: `tutorialActiveProvider` AsyncValue loading/error state'te `false` döner (UI mount hydrate tamamlanana kadar overlay göstermez)
+- **[I12]** TutorialScaffold MUST mount via `MaterialApp.router(builder:)` — router tree context olmadan `GoRouterState.of(context)` fail eder (widget test assertion)
 
 ### 7.2 Definition of Done
 
@@ -868,11 +918,13 @@ Gerekçe: pause sırasında süreç öldürülürse persist garanti edilmiş olm
 - `DebugLogger` debugPrint format (overridePrint)
 - `SessionController` onLaunch/onResume/onPause sequencing — mock TelemetryLogger + fake Ref
 - `InstallIdNotifier` disk-wins reconciliation (3 senaryo: disk empty, disk matches GameState, disk differs from GameState)
-- `TutorialNotifier` state machine:
-  - start() idempotent + no-op if completed
-  - advance(from:) re-entry guard
-  - skip() → completed=true + currentStep=null
-  - complete() → completed=true + currentStep=null
+- `TutorialNotifier` state machine (AsyncNotifier):
+  - build() async — hydrate SharedPreferences (3 senaryo: fresh, firstLaunchMarked=true, tutorialCompleted=true)
+  - start() idempotent + no-op if completed + no-op if firstLaunchMarked
+  - advance(from:) re-entry guard (wrong-step no-op)
+  - skip() → completed=true + currentStep=null + disk write
+  - complete() → completed=true + currentStep=null + disk write
+  - tutorialActiveProvider loading/error state → false (flicker guard [I11])
 
 ### 8.2 Widget
 
@@ -882,21 +934,24 @@ Gerekçe: pause sırasında süreç öldürülürse persist garanti edilmiş olm
   - LayoutBuilder safe area clamp (edge case: target near screen edge)
   - Circle vs rectangle shape render farkı (golden)
 - `TutorialScaffold`:
-  - Route == '/' + Step 2 → BottomNavCallout
-  - Route == '/shop' + Step 2 → CoachMarkOverlay on first row
-  - Step 1 → cupcake halo + skip button
-  - Step 3 → InfoCardOverlay
+  - Route == '/' + Step `openShop` → BottomNavCallout
+  - Route == '/shop' + Step `openShop` → CoachMarkOverlay on first row
+  - Step `tapCupcake` → cupcake halo + skip button
+  - Step `explainCrumbs` → InfoCardOverlay
+  - MaterialApp.router.builder mount assertion (invariant [I12])
+  - AsyncNotifier loading state → overlay gizli (flicker regression test)
 
 ### 8.3 Integration
 
 `tutorial_telemetry_integration_test.dart`:
 1. Cold start (first launch) → AppInstall + SessionStart + TutorialStarted events
-2. Cupcake tap → Step 1 → Step 2 (Home)
-3. Tap BottomNav "Dükkân" → Step 2 (Shop) → halo visible on first row
-4. Tap "Satın al" → Step 2 → Step 3 (info card)
+2. Cupcake tap → step `tapCupcake` → `openShop` (overlay shows BottomNavCallout on Home)
+3. Tap BottomNav "Dükkân" → route changes to /shop → overlay switches to CoachMarkOverlay on first BuildingRow (step remains `openShop`)
+4. Tap "Satın al" (purchase trigger) → step advances to `explainCrumbs` (info card)
 5. Tap "Anladım" → TutorialCompleted(skipped: false) event
-6. Second cold start → no TutorialStarted event (firstLaunchMarked=true)
+6. Second cold start → no TutorialStarted event (firstLaunchMarked=true, AsyncNotifier hydrate returns completed=true/firstLaunchMarked=true)
 7. Invariant: all 5 events carry non-null install_id and non-sentinel value
+8. Invariant [I11]: integration test assert — overlay not rendered in loading frame (mount tick + 1 frame pump → overlay null until AsyncNotifier.data)
 
 ### 8.4 Manual
 
@@ -922,9 +977,9 @@ Etiketler: **(S)** subagent-driven TDD strict, **(C)** controller-direct, **★*
 
 | # | Task | Mode | Critical |
 |---|---|---|---|
-| T6 | `TutorialStep` enum + `TutorialState` freezed + codegen | C | |
-| T7 | `TutorialNotifier` state machine + invariant tests | S | ★ |
-| T8 | `tutorial_providers.dart` + `tutorialActiveProvider` derived | C | |
+| T6 | `TutorialStep` enum (3 values) + `TutorialState` freezed + codegen | C | |
+| T7 | `TutorialNotifier` **AsyncNotifier** state machine + invariant tests (flicker [I11]) | S | ★ |
+| T8 | `tutorial_providers.dart` + `tutorialActiveProvider` (AsyncValue.maybeWhen) | C | |
 
 ### Phase 3 — Tutorial UI widgets (T9-T12)
 
@@ -940,14 +995,14 @@ Etiketler: **(S)** subagent-driven TDD strict, **(C)** controller-direct, **★*
 | # | Task | Mode | Critical |
 |---|---|---|---|
 | T13 | `TutorialScaffold` route-aware + ref.listen advance triggers + test | S | ★ |
-| T14 | GlobalKey injection (HomePage, BottomNav, ShopPage first row) + `main.dart` scaffold mount | C | ★ |
+| T14 | GlobalKey injection (HomePage, BottomNav, ShopPage first row) + `MaterialApp.router(builder:)` scaffold mount ([I12] assertion) | C | ★ |
 | T15 | `AppBootstrap` + `AppLifecycleGate` SessionController integration | S | ★ |
 
 ### Phase 5 — A11y + docs + gates (T16-T17)
 
 | # | Task | Mode | Critical |
 |---|---|---|---|
-| T16 | A11y 48dp audit fixes (3 widget wrap) + widget smoke test | C | |
+| T16 | A11y 48dp audit — `AppTheme` filledButtonTheme + textButtonTheme minimumSize fix (single source) + widget smoke test | C | |
 | T17 | Integration test (tutorial_telemetry) + docs updates (telemetry.md + ux-flows.md + CLAUDE.md §12) | S | ★ |
 
 **Subagent-driven (11):** T1, T2, T3, T4, T7, T9, T10, T11, T13, T15, T17
@@ -995,7 +1050,8 @@ T12 (tr.arb) ──────────────────────�
 | Provider invalidate / hot reload'da `TutorialStarted` tekrar emit | Dashboard double-count | `TutorialScaffold._startInvoked` guard + `start()` idempotent |
 | AppLifecycleGate onPause çağrısı persist'ten önce SessionEnd atarsa | Pause sırasında kaybolan save | Ordering contract §6.3 + integration test assertion |
 | A11y fix wrap'ları mevcut visual density bozarsa | UI regresyon | 48dp wrap yalnız button'lara (text/chip dokunulmaz); golden test spot check |
-| TelemetryLogger stub'ı test environment'ta debugPrint flood eder | Log noise | Testte `ProviderScope(overrides: [telemetryLoggerProvider.overrideWithValue(FakeLogger())])` |
+| TelemetryLogger stub'ı test environment'ta debugPrint flood eder | Log noise | Primary: Testte `ProviderScope(overrides: [telemetryLoggerProvider.overrideWithValue(FakeLogger())])` (override production'a leak etmez). Alternatif: testWidgets içinde `debugPrint = (m, {wrapWidth}) {};` global silence (risk: test'ler arası leak — tearDown'da restore zorunlu) |
+| TutorialNotifier AsyncNotifier loading state UI'da "tutorial yok" gibi görünür | İlk frame overlay gecikmesi (~<50ms) | tutorialActiveProvider loading'de false döner (invariant I11); UI çoğunluğu zaten render edilir, sadece overlay katmanı gecikir — kullanıcı için görünür değil |
 
 ---
 
@@ -1018,6 +1074,8 @@ Kritik regresyon olmasa bile: B3'e kadar tutorial completed=true olan kullanıc�
 - [ ] `install_id_age_ms` payload property — install creation timestamp persistence ekle
 - [ ] Settings → "Tutorial'i tekrar oyna" toggle (TutorialNotifier.reset())
 - [ ] Purchase/Upgrade/ResearchComplete event'leri (telemetry event kataloğu genişlemesi)
+- [ ] GameState hydration side-effect telemetry (offline progress, save recovery) — SessionStart sonrası emit pattern. B2'de `gameStateNotifierProvider.build()` telemetry emit etmez; B3'te provider listen pattern eklenir ki ordering (SessionStart → hydration events) deterministik olsun
+- [ ] Step 2 granularity split (`openShop` → `openShop` + `buyFirstBuilding` ayrımı) — tutorial funnel analytics için drop-off noktası ayırt etmek gerekirse
 - [ ] A11y screen reader contract audit (Semantic labels) — Sprint D
 - [ ] Tutorial Step 4+ (Prestige, Research intro) — post-MVP
 - [ ] Sentry alternatif evaluation (Crashlytics vs Sentry tradeoff) — post-MVP
