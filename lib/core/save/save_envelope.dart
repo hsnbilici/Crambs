@@ -3,8 +3,11 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'save_envelope.freezed.dart';
 part 'save_envelope.g.dart';
 
-/// SaveEnvelope şeması — docs/save-format.md §1
-/// TODO: gameState alanı GameState tipine geçirilecek — ayrı task
+/// SaveEnvelope — disk persistence şeması.
+/// Spec: docs/save-format.md §1
+///
+/// gameState alanı A'da `Map<String, dynamic>` tutuyor; B'de GameState typed
+/// field'a geçilir (envelope version 1 → 2 bump + migrator v1→v2).
 @freezed
 abstract class SaveEnvelope with _$SaveEnvelope {
   const factory SaveEnvelope({
