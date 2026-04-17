@@ -159,7 +159,7 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
       ),
     );
     state = AsyncData(updated);
-    await _persist(updated);
+    _persistSafe(updated, 'buyBuilding');
     return true;
   }
 
@@ -181,11 +181,7 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
       ),
     );
     state = AsyncData(updated);
-    unawaited(
-      _persist(updated).catchError((Object e, StackTrace st) {
-        debugPrint('buyUpgrade persist failed: $e\n$st');
-      }),
-    );
+    _persistSafe(updated, 'buyUpgrade');
     return true;
   }
 
@@ -249,6 +245,20 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     final gs = state.value;
     if (gs == null) return;
     await _persist(gs);
+  }
+
+  /// Fire-and-forget persist wrapper with visibility.
+  ///
+  /// Purchase flows (`buyBuilding`, `buyUpgrade`) use this so UI update is
+  /// immediate; disk write races on SaveRepository's internal lock and can't
+  /// collide. Error surface: debugPrint only (structured signalling deferred
+  /// to B2 telemetry wiring — spec §12 Followups).
+  void _persistSafe(GameState updated, String context) {
+    unawaited(
+      _persist(updated).catchError((Object e, StackTrace st) {
+        debugPrint('$context persist failed: $e\n$st');
+      }),
+    );
   }
 
   /// Test-only helper — T19 integration + buyUpgrade unit tests kullanır.
