@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crumbs/core/feedback/save_recovery.dart';
+import 'package:crumbs/core/save/checksum.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -120,10 +121,12 @@ class SaveRepository {
     }
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
-      return _ReadResult(
-        existed: true,
-        envelope: SaveEnvelope.fromJson(json),
-      );
+      final envelope = SaveEnvelope.fromJson(json);
+      // NFR-2 / save-format.md §3: checksum mismatch = corruption → bak fallback.
+      if (Checksum.of(envelope.gameState) != envelope.checksum) {
+        return const _ReadResult(existed: true);
+      }
+      return _ReadResult(existed: true, envelope: envelope);
     } on Exception {
       return const _ReadResult(existed: true);
     }
