@@ -75,7 +75,7 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
         loadResult.envelope!,
         targetVersion: _kCurrentSchemaVersion,
       );
-      hydrated = GameState.fromJson(migrated.gameState);
+      hydrated = migrated.gameState;
       final now = DateTime.now();
       offlineReport = OfflineProgress.compute(hydrated, now);
       hydrated = hydrated.copyWith(
@@ -190,12 +190,11 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
 
   Future<void> _persist(GameState gs) async {
     final repo = ref.read(saveRepositoryProvider);
-    final json = gs.toJson();
     final envelope = SaveEnvelope(
       version: _kCurrentSchemaVersion,
       lastSavedAt: DateTime.now().toIso8601String(),
-      gameState: json,
-      checksum: Checksum.of(json),
+      gameState: gs,
+      checksum: Checksum.of(gs.toJson()),
     );
     await repo.save(envelope);
   }

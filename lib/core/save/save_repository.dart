@@ -123,7 +123,7 @@ class SaveRepository {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final envelope = SaveEnvelope.fromJson(json);
       // NFR-2 / save-format.md §3: checksum mismatch = corruption → bak fallback.
-      if (Checksum.of(envelope.gameState) != envelope.checksum) {
+      if (Checksum.of(envelope.gameState.toJson()) != envelope.checksum) {
         return const _ReadResult(existed: true);
       }
       return _ReadResult(existed: true, envelope: envelope);
