@@ -4,44 +4,31 @@
 String fmt(double n) {
   if (n.isNaN || n.isInfinite) return '—';
   if (n == 0) return '0';
-  final original = n;
   final sign = n < 0 ? '-' : '';
   var work = n.abs();
   String raw;
   if (work < 10) {
     raw = work.toStringAsFixed(1);
-  } else if (work < 1000) {
+  } else if (work < _kTierThreshold) {
     raw = work.floor().toString();
   } else {
     const units = [
-      'K',
-      'M',
-      'B',
-      'T',
-      'Qa',
-      'Qi',
-      'Sx',
-      'Sp',
-      'Oc',
-      'No',
-      'Dc'
+      'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', //
     ];
     var tier = 0;
-    // Divide by 1000 up to 11 times (units.length times)
-    // Use > 999.5 to handle floating-point rounding near 1000
-    for (var i = 0; i < units.length && work > 999.5; i++) {
+    // Float precision: repeated /1000 drifts — 1e33 after 11 steps ≈ 999.9999.
+    // _kTierThreshold absorbs that drift consistently on both gates.
+    while (tier < units.length && work >= _kTierThreshold) {
       work /= 1000;
       tier++;
     }
-    if (tier >= units.length && work > 999.5) {
-      final exp = original.abs().toStringAsExponential(2);
+    if (work >= _kTierThreshold) {
+      final exp = n.abs().toStringAsExponential(2);
       return '$sign${exp.replaceAll('.', ',')}';
-    }
-    if (tier == 0) {
-      // Shouldn't happen in this branch (work >= 1000), but be safe
-      return '$sign${work.floor()}';
     }
     raw = '${work.toStringAsFixed(work >= 100 ? 1 : 2)}${units[tier - 1]}';
   }
   return '$sign${raw.replaceAll('.', ',')}';
 }
+
+const double _kTierThreshold = 999.5;

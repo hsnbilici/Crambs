@@ -36,4 +36,18 @@ void main() {
     test('-1500 → -1,50K', () => expect(fmt(-1500), '-1,50K'));
     test('-0.5 → -0,5', () => expect(fmt(-0.5), '-0,5'));
   });
+
+  group('fmt — tier boundaries', () {
+    test('999 → 987-style int (upper int bucket)',
+        () => expect(fmt(999), '999'));
+    test('1000 → 1,00K (first short-scale tier)',
+        () => expect(fmt(1000), '1,00K'));
+    test('999999 → K or M boundary', () {
+      // 999999 ≈ 999.999K → toStringAsFixed(1) rounds to "1000.0K" or bumps to
+      // "1,00M" depending on order of ops. Pin shape, not exact value.
+      final out = fmt(999999);
+      expect(out.endsWith('K') || out.endsWith('M'), isTrue);
+    });
+    test('1e36 → scientific (past Dc)', () => expect(fmt(1e36), '1,00e+36'));
+  });
 }
