@@ -1,17 +1,12 @@
 import 'dart:io' show Platform;
 
-import 'package:crumbs/core/telemetry/debug_logger.dart';
 import 'package:crumbs/core/telemetry/install_id_notifier.dart';
 import 'package:crumbs/core/telemetry/telemetry_event.dart';
 import 'package:crumbs/core/telemetry/telemetry_logger.dart';
+import 'package:crumbs/core/telemetry/telemetry_providers.dart'
+    show telemetryLoggerProvider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-
-/// Telemetry logger provider — default DebugLogger.
-/// B3'te FirebaseAnalyticsLogger ile override edilecek (tek satır).
-/// Not: Bu provider T5'te telemetry_providers.dart barrel'a taşınacak.
-final telemetryLoggerProvider =
-    Provider<TelemetryLogger>((ref) => DebugLogger());
 
 /// Cold/warm/pause session geçişlerini yöneten controller.
 /// - onLaunch(firstLaunchMarkedBefore: true) → AppInstall + SessionStart

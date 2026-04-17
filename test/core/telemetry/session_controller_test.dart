@@ -2,6 +2,8 @@ import 'package:crumbs/core/telemetry/install_id_notifier.dart';
 import 'package:crumbs/core/telemetry/session_controller.dart';
 import 'package:crumbs/core/telemetry/telemetry_event.dart';
 import 'package:crumbs/core/telemetry/telemetry_logger.dart';
+import 'package:crumbs/core/telemetry/telemetry_providers.dart'
+    show telemetryLoggerProvider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
