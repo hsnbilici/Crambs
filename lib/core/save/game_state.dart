@@ -1,3 +1,4 @@
+import 'package:crumbs/core/save/upgrade_state.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'game_state.freezed.dart';
@@ -17,6 +18,7 @@ abstract class GameState with _$GameState {
     required MetaState meta,
     required InventoryState inventory,
     required BuildingsState buildings,
+    @Default(UpgradeState()) UpgradeState upgrades,
   }) = _GameState;
 
   factory GameState.fromJson(Map<String, dynamic> json) =>
