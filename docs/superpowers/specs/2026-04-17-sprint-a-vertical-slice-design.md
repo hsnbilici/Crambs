@@ -21,7 +21,7 @@ En küçük bitmiş idle oyun döngüsü: **tap → R1 kazan → Crumb Collector
 - **5-slot alt nav + More overflow** (ux-flows.md §3.1'e birebir uyum): Home ✓, Shop ✓, Upgrades 🔒, Research 🔒, More ✓ (Events 🔒, Prestige 🔒, Collection 🔒, Settings placeholder)
 - **Number format:** `<10` → 1 ondalık; `10-999` → int; `1000+` → short scale K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc; `>Dc` → bilimsel gösterim; TR locale ondalık ayırıcı `,`
 - **Save:** atomic write (tmp→rename), SHA-256 checksum (canonical JSON), 30s auto-save + app lifecycle (paused/detached) save + purchase-sonrası sync save
-- **Offline progress:** açılışta `now − meta.lastSavedAt` delta × `Production.totalPerSecond`; sayaca eklenir; snackbar "Yokken X Crumb kazandın (Y dk)"; cap `Duration(days: 365)` (A: efektif sınırsız; B'de 12h)
+- **Offline progress:** açılışta `now − meta.lastSavedAt` delta × `Production.totalPerSecond`; sayaca eklenir; snackbar "Yokken X Crumb kazandın (Y dk)"; cap `Duration(hours: 24)` (A: makul — shock-value yok; B'de 12h)
 - **Inline onboarding hint:** ilk açılışta overlay "Cupcake'e dokun, Crumbs kazan"; 1 tap sonrası dismiss + persist (SharedPreferences)
 - **Visual-design.md artisan palette wire:** Material 3 `ColorScheme.fromSeed(Color(0xFFE8A53C))` placeholder warm amber; `tabularFigures` display typography
 - **SaveEnvelope tam impl:** freezed 3.x `abstract class`, migration interface v1 no-op (framework hazır)
@@ -152,11 +152,13 @@ abstract class OnboardingPrefs with _$OnboardingPrefs {
 ```
 gameStateNotifierProvider    AsyncNotifier<GameState>
   ├─ build() async: hydrate(load → migrate → offlineDelta) → push OfflineReport+SaveRecoveryReason
-  │                 → Timer.periodic(200ms, _onTick) → ref.onDispose(timer.cancel)
-  ├─ tapCrumb()                    — sync, +1, haptic throttle, floating number spawn
-  ├─ Future<bool> buyBuilding(id)  — true=success (sync save), false=insufficient
-  ├─ applyProductionDelta(seconds) — tick + offline common formula
-  └─ resetTickClock()               — onResume; _lastTickAt = null
+  │                 → _lastTickAt = now → Timer.periodic(200ms, _onTick) → ref.onDispose(timer.cancel)
+  ├─ tapCrumb()                       — sync, +1, haptic throttle, floating number spawn
+  ├─ Future<bool> buyBuilding(id)     — true=success (sync save), false=insufficient
+  ├─ applyProductionDelta(seconds)    — tick + offline common formula
+  ├─ Future<void> applyResumeDelta()  — onResume: offline progress since meta.lastSavedAt
+  │                                     + update lastSavedAt + optionally push OfflineReport
+  └─ resetTickClock()                  — _lastTickAt = null; applyResumeDelta sonrası çağrılır
 
 onboardingPrefsProvider      Notifier<OnboardingPrefs>     SharedPreferences backed
 saveRepositoryProvider       Provider<SaveRepository>      saf servis (save/load/migrate)
@@ -193,7 +195,11 @@ AppLifecycleGate (ConsumerStatefulWidget wrapper)
     _listener = AppLifecycleListener(
       onPause:  () async => await _saveNow(),
       onDetach: () async => await _saveNow(),
-      onResume: () => ref.read(gameStateNotifierProvider.notifier).resetTickClock(),
+      onResume: () async {
+        final notifier = ref.read(gameStateNotifierProvider.notifier);
+        await notifier.applyResumeDelta();  // offline progress from meta.lastSavedAt
+        notifier.resetTickClock();            // warmup tick, _lastTickAt = null
+      },
     )
     _autoSaveTimer = Timer.periodic(30s, (_) async => await _saveNow())
   dispose: timer.cancel + listener.dispose
@@ -201,7 +207,14 @@ AppLifecycleGate (ConsumerStatefulWidget wrapper)
 
 **Neden AppLifecycleListener:** Flutter 3.13+ tercih; sadece ihtiyaç olan callback'ler alınır (`didChangeAppLifecycleState` switch'i yok).
 
-**Neden `resetTickClock()` onResume'da:** Pause'da `_lastTickAt` eski kalır; resume'da ilk tick `now − pauseTime` olur (5 dk gibi); lifecycle save zaten state'i güncellediğinden 5 dk'lık production double-count'lanır. Reset bu çift sayımı önler.
+**Neden `applyResumeDelta() + resetTickClock()` onResume'da:**
+Pause'da `_saveNow()` state'i diskle hizalar, `meta.lastSavedAt = pauseTime`. 5 dk sonra resume:
+- **Sadece `resetTickClock()` çağrılırsa** → tick warmup'lar (0s ilk tick), arada geçen 5 dk'lık pasif üretim kaybolur (uygulama foreground'da olmadığı için Timer fire etmedi).
+- **`applyResumeDelta()` ilk çağrılırsa** → `OfflineProgress.compute(state, now)` çalışır (`seconds = now − meta.lastSavedAt`), delta sayaca eklenir, `meta.lastSavedAt = now` olur. Sonra `resetTickClock()` warmup'ı başlatır.
+
+Tick drift fix'iyle aynı kod yolu kullanılır (`Production.tickDelta`). Cold start (build) + hot resume aynı formülü çağırır — single source of truth.
+
+`applyResumeDelta` snackbar göstermez (hot resume'da "yokken kazandın" ürpertici). Sadece state'i günceller ve sessiz devam eder. `OfflineReport` yalnızca cold start'ta gösterilir.
 
 ---
 
@@ -403,8 +416,9 @@ class Checksum {
 class OfflineProgress {
   const OfflineProgress._();
 
-  /// A: efektif sınırsız. B'de Duration(hours: 12). Tek satır const değişimi.
-  static const Duration _kOfflineCap = Duration(days: 365);
+  /// A: 24 saat cap — test cihazını günlerce kapatan kullanıcıya shock-value
+  /// snackbar yerine makul UX. B'de Duration(hours: 12)'ye indirir; spec §3.4.
+  static const Duration _kOfflineCap = Duration(hours: 24);
 
   static OfflineReport compute(GameState state, DateTime now) {
     final last = DateTime.parse(state.meta.lastSavedAt);
@@ -542,6 +556,7 @@ class AppTheme {
 String fmt(double n) {
   if (n.isNaN || n.isInfinite) return '—';
   if (n == 0) return '0';
+  final original = n;
   final sign = n < 0 ? '-' : '';
   n = n.abs();
   String raw;
@@ -552,18 +567,25 @@ String fmt(double n) {
   } else {
     const units = ['K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
     int tier = 0;
-    while (n >= 1000 && tier < units.length) {
+    while (tier < units.length && n >= 1000) {
       n /= 1000;
       tier++;
     }
-    if (tier > units.length) {
-      return '$sign${(n * pow(1000, tier - units.length)).toStringAsExponential(2).replaceAll('.', ',')}';
+    // Overflow kontrolü: units tükendiyse hala n >= 1000 demektir
+    if (n >= 1000) {
+      // Bilimsel gösterim orijinal sayı üzerinden
+      return '${original.abs().toStringAsExponential(2).replaceAll('.', ',')}'
+             .replaceFirst(RegExp(r'^'), sign);
     }
     raw = '${n.toStringAsFixed(n >= 100 ? 1 : 2)}${units[tier - 1]}';
   }
   return '$sign${raw.replaceAll('.', ',')}';
 }
 ```
+
+**Düzeltme:** eski kod `while (n >= 1000 && tier < units.length)` + `if (tier > units.length)` — ikinci koşul asla true olamıyordu (ölü kod). Yeni: while döngüsü units tükendiğinde durur; sonraki `if (n >= 1000)` kontrolü overflow'u yakalar → bilimsel gösterim orijinal sayıdan üretilir.
+
+**Test matrisi ekle:** `1e42` → bilimsel notasyon (Dc'yi geçer), overflow branch coverage.
 
 **Test matrisi:** `0 → '0'`, `0.8 → '0,8'`, `9.2 → '9,2'`, `10 → '10'`, `42.7 → '42'`, `987 → '987'`, `1234 → '1,23K'`, `1e6 → '1,00M'`, `1.5e9 → '1,50B'`, `1e18 → Dc civarı`, `1e42 → scientific fallback`, `-1500 → '-1,50K'`, `NaN → '—'`, `infinity → '—'`.
 
@@ -674,7 +696,7 @@ State management: `floatingNumbersProvider` (`StateNotifier<List<FloatingNumber>
 - `CostCurve.costFor` — owned 0/1/5/25 beklenen değerler (economy.md §5 örneği)
 - `Production.totalPerSecond` — 0/1/5 Collector; boş/unknown id map invariant
 - `Production.tickDelta` — 0.2s, 1.0s, 0s edge cases
-- **Lineer akkümülasyon:** `5 × tickDelta(b, 0.2)` ≈ `tickDelta(b, 1.0)` (epsilon 1e-9)
+- **Lineer akkümülasyon:** `5 × tickDelta(b, 0.2)` ≈ `tickDelta(b, 1.0)` (relative tolerance: `abs(a-b) < max(abs(a), abs(b)) * 1e-12` — bina sayısı scale'ine göre sağlam; absolute 1e-9 yüksek owned'da riskli)
 - `OfflineProgress.compute` — 0/30s/1h/>365d (cap bayrağı test)
 - Cap senaryosu: 2 gün offline → 1 yıl cap devreye girer mi (A için `capped: false` beklenen, çünkü cap 365 gün)
 
@@ -707,9 +729,9 @@ State management: `floatingNumbersProvider` (`StateNotifier<List<FloatingNumber>
 4. Navigate to shop → Crumb Collector row görünür
 5. Tap "Satın al" → owned 1, crumbs 0
 6. Resume to home → sayaç pasif olarak artıyor
-7. Simulate lifecycle paused → save dosyası yazılı
-8. Simulate lifecycle resumed + 5s elapsed → tick clock reset, next tick 200ms production
-9. Full restart (new container) → save load, offline progress applied, welcome back snackbar
+7. Simulate lifecycle paused → save dosyası yazılı, meta.lastSavedAt güncel
+8. Simulate 5s wall-clock + lifecycle resumed → applyResumeDelta çağrıldı (5s × owned × 0.1 C/s eklendi), lastSavedAt = resume time; resetTickClock sonrası warmup tick 0.0s; snackbar GÖSTERİLMEZ (hot resume sessiz)
+9. Full restart (new container) → save load, offline progress applied, welcome-back snackbar GÖSTERİLİR
 10. Corrupt main save → restart → .bak'tan yüklendi, recovery snackbar
 ```
 
@@ -729,11 +751,11 @@ State management: `floatingNumbersProvider` (`StateNotifier<List<FloatingNumber>
 | 6 | **OfflineProgress + OfflineReport:** compute + cap const + flag + tests | S | `lib/core/economy/offline_progress.dart`, `lib/core/feedback/offline_report.dart` |
 | 7 | **Checksum:** canonical SHA-256 + determinism shipping-gate test + round-trip | S | `lib/core/save/checksum.dart` |
 | 8 | **SaveEnvelope + SaveMigrator interface:** freezed abstract v1, migration v1 no-op, framework | S | `lib/core/save/save_envelope.dart`, `save_migrator.dart` |
-| 9 | **SaveRepository:** path_provider paths, atomic write, .bak rotation, corruption recovery, `SaveRecoveryReason` sinyali, mocktail unit tests | S | `lib/core/save/save_repository.dart`, `lib/core/feedback/save_recovery.dart` |
+| 9 | **SaveRepository:** path_provider paths, atomic write, .bak rotation, corruption recovery, `SaveRecoveryReason` sinyali, **save serialization lock** (`Future<void>? _pending` ile in-flight save'ler serialize; 30s timer + purchase sync + lifecycle pause çakışmasını önler — Fix #3), mocktail unit tests (concurrent save race test dahil) | S | `lib/core/save/save_repository.dart`, `lib/core/feedback/save_recovery.dart` |
 | 10 | **OnboardingPrefs provider:** SharedPreferences Notifier, `hintDismissed` persist | C | `lib/core/preferences/onboarding_prefs.dart` |
-| 11 | **GameStateNotifier (AsyncNotifier):** build hydrate flow, tap/buy/tick/resetTickClock, offlineReport + saveRecovery push; cross-feature (Home + Shop okur) | C (integration) | `lib/core/state/game_state_notifier.dart` |
+| 11 | **GameStateNotifier (AsyncNotifier):** build hydrate flow, `tapCrumb`, `buyBuilding`, `applyProductionDelta`, **`applyResumeDelta`** (hot resume offline progress, sessiz), `resetTickClock`; offlineReport + saveRecovery push cold start'ta; cross-feature (Home + Shop okur). Timer spawn öncesi `_lastTickAt = DateTime.now()` set (Fix #4). | C (integration) | `lib/core/state/game_state_notifier.dart` |
 | 12 | **AppBootstrap (pre-hydration):** `initialize()` ProviderContainer + SharedPreferences warm | C | `lib/app/boot/app_bootstrap.dart` |
-| 13 | **AppLifecycleGate:** `AppLifecycleListener` + 30s autoSaveTimer + resetTickClock onResume | C | `lib/app/lifecycle/app_lifecycle_gate.dart` |
+| 13 | **AppLifecycleGate:** `AppLifecycleListener` (onPause/onDetach → `_saveNow` await; **onResume → `applyResumeDelta` → `resetTickClock` — hot resume offline progress bug fix**) + 30s autoSaveTimer | C | `lib/app/lifecycle/app_lifecycle_gate.dart` |
 | 14 | **Derived providers:** `currentCrumbsProvider`, `productionRateProvider`, `costCurveProvider.family` (core/state) + `floatingNumbersProvider` (features/home) | C | `lib/core/state/providers.dart`, `lib/features/home/providers.dart` |
 | 15 | **Number formatter `fmt()`** + TR locale + full test matrix | S | `lib/ui/format/number_format.dart` |
 | 16 | **AppTheme.artisan:** Material 3 seed + tabularFigures + light/dark | C | `lib/ui/theme/app_theme.dart` |
@@ -777,6 +799,11 @@ Paralel yasak (skill kuralı). Her S task'ı: implementer → spec compliance re
 - **AsyncError friendly screen:** Default Flutter red error screen yerine "Restart"lı friendly ekran. Sprint B.
 - **Post-prestige nav limit:** Material 3 NavigationBar 3-5 destination sınırı; 6+ için NavigationRail (tablet) veya custom FAB + overflow.
 - **Anti-cheat (gerekirse):** SHA-256 → HMAC geçişi, server-side secret. `Checksum.of` API surface korunur.
+- **economy.md §5 floor/round doğrulama:** CostCurve `.floor()` kullanıyor; `economy.md §5` metninin `floor` mu `round` mu dediği onay gerektirir. B sprint başında cross-check; farkın 1-2 birim ama early-game cost tempo hissiyatını etkiler. — Fix #5
+- **SaveEnvelope typed GameState migration:** A'da envelope `Map<String, dynamic> gameState` tutuyor (T3 scaffold carryover). B'de `GameState gameState` typed field'a geçilir; `Checksum.of(envelope.gameState.toJson())` explicit olur. Tek migration commit (envelope shape değişir ama `version: 1 → 2` bump + migrator v1→v2 no-op-shape). — Fix #7
+- **BuildingRow shake state pattern:** A'da tek Crumb Collector row var. B'de 3 bina olunca her row bağımsız shake state ister. Widget şimdiden `StatefulWidget` + local `AnimationController` ile kurgulanır (Task 17 notu) — B'de refactor gerekmez. — Fix #8
+- **Freezed 3.x `abstract class` tutarlılığı:** A'daki yeni freezed'lar (GameState, OfflineReport, OnboardingPrefs, MetaState, InventoryState, BuildingsState) hepsi `abstract class X with _$X` pattern'iyle yazılır; scaffold'daki mevcut `SaveEnvelope` + controllers aynı convention'da. Karışım yapılmaz. — Fix #9
+- **install_id persistence:** A'da `GameState.initial({installId})` UUID üretir; save corruption'da fresh `initial()` → yeni UUID, telemetry'de aynı user çoklu install. B'de (telemetry bağlanırken) `installIdProvider` SharedPreferences backed Notifier eklenir; AppBootstrap ilk açılışta persist eder, sonraki tüm `GameState.initial()` bu stable ID'yi kullanır. — Fix #10
 
 ---
 
