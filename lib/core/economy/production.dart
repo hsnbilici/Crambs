@@ -7,21 +7,27 @@
 class Production {
   const Production._();
 
-  /// Base production (C/s). economy.md §2.
+  /// Base production (C/s). economy.md §4.
   static double baseProductionFor(String buildingId) => switch (buildingId) {
         'crumb_collector' => 0.1,
+        'oven' => 1.0,
+        'bakery_line' => 8.0,
         _ => 0,
       };
 
-  /// Base cost. economy.md §2. CostCurve.costFor bu değeri büyütür.
+  /// Base cost. economy.md §4. CostCurve.costFor bu değeri büyütür.
   static num baseCostFor(String buildingId) => switch (buildingId) {
-        'crumb_collector' => 10,
+        'crumb_collector' => 15,
+        'oven' => 120,
+        'bakery_line' => 1200,
         _ => 0,
       };
 
-  /// Growth rate — cost(n) = base × growth^owned. economy.md §5.
+  /// Growth rate — cost(n) = base × growth^owned. economy.md §4.
   static double growthFor(String buildingId) => switch (buildingId) {
-        'crumb_collector' => 1.15,
+        'crumb_collector' => 1.12,
+        'oven' => 1.12,
+        'bakery_line' => 1.13,
         _ => 1,
       };
 

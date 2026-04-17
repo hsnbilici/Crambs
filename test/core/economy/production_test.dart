@@ -13,8 +13,8 @@ void main() {
   });
 
   group('Production.baseCostFor', () {
-    test('crumb_collector → 10', () {
-      expect(Production.baseCostFor('crumb_collector'), 10);
+    test('crumb_collector → 15', () {
+      expect(Production.baseCostFor('crumb_collector'), 15);
     });
 
     test('unknown id → 0', () {
@@ -23,8 +23,8 @@ void main() {
   });
 
   group('Production.growthFor', () {
-    test('crumb_collector → 1.15', () {
-      expect(Production.growthFor('crumb_collector'), 1.15);
+    test('crumb_collector → 1.12', () {
+      expect(Production.growthFor('crumb_collector'), 1.12);
     });
 
     test('unknown id → 1.0 (flat)', () {
@@ -81,6 +81,32 @@ void main() {
         diff,
         lessThan(tolerance.isFinite && tolerance > 0 ? tolerance : 1e-9),
       );
+    });
+  });
+
+  group('Production — economy.md §4 table values', () {
+    test('crumb_collector matches economy §4', () {
+      expect(Production.baseProductionFor('crumb_collector'), 0.1);
+      expect(Production.baseCostFor('crumb_collector'), 15);
+      expect(Production.growthFor('crumb_collector'), 1.12);
+    });
+
+    test('oven matches economy §4', () {
+      expect(Production.baseProductionFor('oven'), 1.0);
+      expect(Production.baseCostFor('oven'), 120);
+      expect(Production.growthFor('oven'), 1.12);
+    });
+
+    test('bakery_line matches economy §4', () {
+      expect(Production.baseProductionFor('bakery_line'), 8.0);
+      expect(Production.baseCostFor('bakery_line'), 1200);
+      expect(Production.growthFor('bakery_line'), 1.13);
+    });
+
+    test('unknown building defensive fallback', () {
+      expect(Production.baseProductionFor('unknown'), 0);
+      expect(Production.baseCostFor('unknown'), 0);
+      expect(Production.growthFor('unknown'), 1);
     });
   });
 }

@@ -67,7 +67,7 @@ void main() {
     final result = await notifier.buyBuilding('crumb_collector');
     expect(result, isTrue);
     final gs = container.read(gameStateNotifierProvider).value!;
-    expect(gs.inventory.r1Crumbs, 5);
+    expect(gs.inventory.r1Crumbs, 0);
     expect(gs.buildings.owned['crumb_collector'], 1);
   });
 
@@ -82,7 +82,7 @@ void main() {
     await notifier.buyBuilding('crumb_collector');
     notifier.applyProductionDelta(10);
     final gs = container.read(gameStateNotifierProvider).value!;
-    expect(gs.inventory.r1Crumbs, closeTo(6, 1e-9));
+    expect(gs.inventory.r1Crumbs, closeTo(1, 1e-9));
   });
 
   test('applyResumeDelta — hot resume offline progress, no OfflineReport push',
@@ -103,7 +103,7 @@ void main() {
     expect(
       after.inventory.r1Crumbs - before.inventory.r1Crumbs,
       closeTo(3, 1e-9),
-    );
+    ); // 1 collector × 0.1 C/s × 30s = 3
     // INVARIANT: OfflineReport NOT pushed on hot resume
     expect(container.read(offlineReportProvider), isNull);
     // INVARIANT: SaveRecovery NOT pushed on hot resume
