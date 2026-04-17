@@ -1472,7 +1472,9 @@ git commit -m "sprint-a(T10): OnboardingPrefs SharedPreferences-backed Notifier"
 
 ---
 
-## Task 11: GameStateNotifier (AsyncNotifier — integration)
+## Task 11: GameStateNotifier (AsyncNotifier — S, critical invariants)
+
+> **Execution mode: S (subagent-driven).** Kritik invariant'lar taşır: `applyResumeDelta` OfflineReport push ETMEZ (spec §2.3, §2.4 sertleştirilmiş kural); cold start vs hot resume iki ayrı path — aynı `Production.tickDelta` formülüne indirger; tick race fix `_lastTickAt = DateTime.now()` Timer spawn ÖNCESİ; cross-feature (Home + Shop okur). Spec reviewer özellikle "hot resume path'inden OfflineReport / saveRecovery push çağrısı YOKTUR" assertion'ını cross-check eder.
 
 **Files:**
 - Create: `lib/core/state/game_state_notifier.dart`
