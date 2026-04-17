@@ -5,6 +5,7 @@ import 'package:crumbs/features/home/widgets/crumb_counter_header.dart';
 import 'package:crumbs/features/home/widgets/floating_number_overlay.dart';
 import 'package:crumbs/features/home/widgets/onboarding_hint.dart';
 import 'package:crumbs/features/home/widgets/tap_area.dart';
+import 'package:crumbs/features/tutorial/keys.dart';
 import 'package:crumbs/l10n/app_strings.dart';
 import 'package:crumbs/ui/format/number_format.dart';
 import 'package:flutter/material.dart';
@@ -40,21 +41,21 @@ class HomePage extends ConsumerWidget {
         ref.read(saveRecoveryProvider.notifier).clear();
       });
 
-    return const Scaffold(
+    return Scaffold(
       body: Stack(
         children: [
           Column(
             children: [
-              CrumbCounterHeader(),
-              Expanded(child: TapArea()),
-              SizedBox(height: 8),
+              const CrumbCounterHeader(),
+              Expanded(child: TapArea(key: kTutorialCupcakeKey)),
+              const SizedBox(height: 8),
             ],
           ),
-          FloatingNumberOverlay(),
-          OnboardingHint(),
+          const FloatingNumberOverlay(),
+          const OnboardingHint(),
         ],
       ),
-      bottomNavigationBar: AppNavigationBar(currentIndex: 0),
+      bottomNavigationBar: const AppNavigationBar(currentIndex: 0),
     );
   }
 }

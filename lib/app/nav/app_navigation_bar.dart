@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:crumbs/features/tutorial/keys.dart';
 import 'package:crumbs/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -82,7 +83,7 @@ class AppNavigationBar extends StatelessWidget {
       destinations: [
         NavigationDestination(icon: const Icon(Icons.home), label: s.navHome),
         NavigationDestination(
-          icon: const Icon(Icons.store),
+          icon: Icon(Icons.store, key: kTutorialShopNavKey),
           label: s.navShop,
         ),
         NavigationDestination(
