@@ -1,5 +1,4 @@
 import 'package:crumbs/core/tutorial/tutorial_notifier.dart';
-import 'package:crumbs/core/tutorial/tutorial_state.dart';
 import 'package:crumbs/core/tutorial/tutorial_step.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -122,9 +121,9 @@ void main() {
 
     test('openShop → explainCrumbs', () async {
       final c = await startedContainer();
-      final notifier = c.read(tutorialNotifierProvider.notifier);
-      notifier.advance(from: TutorialStep.tapCupcake);
-      notifier.advance(from: TutorialStep.openShop);
+      c.read(tutorialNotifierProvider.notifier)
+        ..advance(from: TutorialStep.tapCupcake)
+        ..advance(from: TutorialStep.openShop);
       expect(c.read(tutorialNotifierProvider).requireValue.currentStep,
           TutorialStep.explainCrumbs);
     });
@@ -140,10 +139,10 @@ void main() {
 
     test('explainCrumbs advance → currentStep becomes null', () async {
       final c = await startedContainer();
-      final notifier = c.read(tutorialNotifierProvider.notifier);
-      notifier.advance(from: TutorialStep.tapCupcake);
-      notifier.advance(from: TutorialStep.openShop);
-      notifier.advance(from: TutorialStep.explainCrumbs);
+      c.read(tutorialNotifierProvider.notifier)
+        ..advance(from: TutorialStep.tapCupcake)
+        ..advance(from: TutorialStep.openShop)
+        ..advance(from: TutorialStep.explainCrumbs);
       expect(c.read(tutorialNotifierProvider).requireValue.currentStep, null);
     });
   });
