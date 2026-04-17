@@ -1,0 +1,38 @@
+{
+  "@@locale": "tr",
+  "appTitle": "Crumbs",
+  "tapHint": "Cupcake'e dokun, Crumbs kazan",
+  "welcomeBack": "Yokken {amount} Crumb kazandın ({duration})",
+  "@welcomeBack": {
+    "placeholders": {
+      "amount": { "type": "String" },
+      "duration": { "type": "String" }
+    }
+  },
+  "offlineCapped": "Çevrim dışı kazanç {cap} saate sınırlandı",
+  "@offlineCapped": { "placeholders": { "cap": { "type": "int" } } },
+  "saveRecoveryBackup": "Son kayıt bozuk, yedekten yüklendi",
+  "saveRecoveryFresh": "Kayıt kurtarılamadı, yeni başladı",
+  "crumbCollectorName": "Crumb Collector",
+  "buyButton": "Satın al",
+  "ownedLabel": "Sahip: {count}",
+  "@ownedLabel": { "placeholders": { "count": { "type": "int" } } },
+  "insufficientCrumbs": "Yetersiz Crumb",
+  "rateLabel": "C/s: {rate}",
+  "@rateLabel": { "placeholders": { "rate": { "type": "String" } } },
+  "navHome": "Ev",
+  "navShop": "Dükkân",
+  "navUpgrades": "Yükseltmeler",
+  "navResearch": "Araştırma",
+  "navMore": "Daha fazla",
+  "navEvents": "Olaylar",
+  "navPrestige": "Prestige",
+  "navCollection": "Koleksiyon",
+  "navSettings": "Ayarlar",
+  "navLockUpgradesA": "Sonraki güncellemede açılır",
+  "navLockResearch": "15-30 dakika oyun sonrası açılır",
+  "navLockEvents": "Yakında",
+  "navLockPrestige": "Prestige koşulu sağlandığında açılır",
+  "navLockCollection": "Yakında",
+  "settingsPlaceholder": "Ayarlar yakında eklenecek"
+}

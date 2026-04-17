@@ -1,0 +1,8 @@
+# l10n.yaml — flutter gen-l10n konfigürasyonu
+# synthetic-package kaldırıldı — Flutter 3.41.5 ile deprecate oldu.
+# Generated file: lib/l10n/app_strings.dart (same dir as tr.arb, non-synthetic default).
+# Downstream import: package:crumbs/l10n/app_strings.dart
+arb-dir: lib/l10n
+template-arb-file: tr.arb
+output-localization-file: app_strings.dart
+output-class: AppStrings
