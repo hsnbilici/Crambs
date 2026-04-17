@@ -14,6 +14,8 @@ class ShopPage extends StatelessWidget {
       body: ListView(
         children: [
           BuildingRow(id: 'crumb_collector', displayName: s.crumbCollectorName),
+          BuildingRow(id: 'oven', displayName: s.ovenName),
+          BuildingRow(id: 'bakery_line', displayName: s.bakeryLineName),
         ],
       ),
       bottomNavigationBar: const AppNavigationBar(currentIndex: 1),
