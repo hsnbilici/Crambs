@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:crumbs/core/economy/cost_curve.dart';
+import 'package:crumbs/core/economy/multiplier_chain.dart';
 import 'package:crumbs/core/economy/offline_progress.dart';
 import 'package:crumbs/core/economy/production.dart';
+import 'package:crumbs/core/economy/upgrade_defs.dart';
 import 'package:crumbs/core/feedback/offline_report.dart';
 import 'package:crumbs/core/feedback/save_recovery.dart';
 import 'package:crumbs/core/preferences/onboarding_prefs.dart';
@@ -10,6 +12,7 @@ import 'package:crumbs/core/save/checksum.dart';
 import 'package:crumbs/core/save/game_state.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
 import 'package:crumbs/core/save/save_repository.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -76,7 +79,14 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
       // buraya hep target version (v2) typed şekilde ulaşır.
       hydrated = loadResult.envelope!.gameState;
       final now = DateTime.now();
-      offlineReport = OfflineProgress.compute(hydrated, now);
+      final multiplier = MultiplierChain.globalMultiplier(
+        hydrated.upgrades.owned,
+      );
+      offlineReport = OfflineProgress.compute(
+        hydrated,
+        now,
+        globalMultiplier: multiplier,
+      );
       hydrated = hydrated.copyWith(
         inventory: hydrated.inventory.copyWith(
           r1Crumbs: hydrated.inventory.r1Crumbs + offlineReport.earned,
@@ -153,10 +163,41 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     return true;
   }
 
+  /// Upgrade satın al. Fire-and-forget persist — purchase state UI immediate,
+  /// disk write async (race lock SaveRepository.save içinde).
+  /// Defensive branch'ler (exists, already owned) malformed state için;
+  /// production happy-path'te sadece cost gate çalışır.
+  Future<bool> buyUpgrade(String id) async {
+    final gs = state.value;
+    if (gs == null) return false;
+    if (!UpgradeDefs.exists(id)) return false;
+    if (gs.upgrades.owned[id] == true) return false;
+    final cost = UpgradeDefs.baseCostFor(id);
+    if (gs.inventory.r1Crumbs < cost) return false;
+    final updated = gs.copyWith(
+      inventory: gs.inventory.copyWith(r1Crumbs: gs.inventory.r1Crumbs - cost),
+      upgrades: gs.upgrades.copyWith(
+        owned: {...gs.upgrades.owned, id: true},
+      ),
+    );
+    state = AsyncData(updated);
+    unawaited(
+      _persist(updated).catchError((Object e, StackTrace st) {
+        debugPrint('buyUpgrade persist failed: $e\n$st');
+      }),
+    );
+    return true;
+  }
+
   void applyProductionDelta(double seconds) {
     final gs = state.value;
     if (gs == null) return;
-    final delta = Production.tickDelta(gs.buildings.owned, seconds);
+    final multiplier = MultiplierChain.globalMultiplier(gs.upgrades.owned);
+    final delta = Production.tickDelta(
+      gs.buildings.owned,
+      seconds,
+      globalMultiplier: multiplier,
+    );
     if (delta == 0) return;
     state = AsyncData(gs.copyWith(
       inventory: gs.inventory.copyWith(
@@ -167,6 +208,7 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
 
   /// Hot resume path — sync, sessiz.
   /// INVARIANT: NEITHER offlineReportProvider NOR saveRecoveryProvider changed.
+  /// INVARIANT (#10): upgrades map UNTOUCHED — copyWith only inventory + meta.
   void applyResumeDelta({DateTime? now}) {
     final gs = state.value;
     if (gs == null) return;
@@ -174,7 +216,12 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     final last = DateTime.parse(gs.meta.lastSavedAt);
     final seconds = n.difference(last).inMicroseconds / 1e6;
     if (seconds <= 0) return;
-    final delta = Production.tickDelta(gs.buildings.owned, seconds);
+    final multiplier = MultiplierChain.globalMultiplier(gs.upgrades.owned);
+    final delta = Production.tickDelta(
+      gs.buildings.owned,
+      seconds,
+      globalMultiplier: multiplier,
+    );
     state = AsyncData(gs.copyWith(
       inventory: gs.inventory.copyWith(
         r1Crumbs: gs.inventory.r1Crumbs + delta,
@@ -202,6 +249,21 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     final gs = state.value;
     if (gs == null) return;
     await _persist(gs);
+  }
+
+  /// Test-only helper — T19 integration + buyUpgrade unit tests kullanır.
+  /// Production UI bu API'ye erişmez (@visibleForTesting).
+  @visibleForTesting
+  void debugAddCrumbs(double amount) {
+    final gs = state.value;
+    if (gs == null) return;
+    state = AsyncData(
+      gs.copyWith(
+        inventory: gs.inventory.copyWith(
+          r1Crumbs: gs.inventory.r1Crumbs + amount,
+        ),
+      ),
+    );
   }
 
   void _triggerHaptic() {

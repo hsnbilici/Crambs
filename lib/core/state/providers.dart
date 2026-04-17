@@ -1,4 +1,5 @@
 import 'package:crumbs/core/economy/cost_curve.dart';
+import 'package:crumbs/core/economy/multiplier_chain.dart';
 import 'package:crumbs/core/economy/production.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +12,12 @@ final currentCrumbsProvider = Provider<double>((ref) {
 
 final productionRateProvider = Provider<double>((ref) {
   final gs = ref.watch(gameStateNotifierProvider).value;
-  return gs == null ? 0 : Production.totalPerSecond(gs.buildings.owned);
+  if (gs == null) return 0;
+  final multiplier = MultiplierChain.globalMultiplier(gs.upgrades.owned);
+  return Production.totalPerSecond(
+    gs.buildings.owned,
+    globalMultiplier: multiplier,
+  );
 });
 
 /// Family key: (buildingId, ownedCount). Shop BuildingRow bu provider'ı watch

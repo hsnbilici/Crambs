@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:crumbs/core/save/save_repository.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
+import 'package:crumbs/core/state/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -120,5 +121,127 @@ void main() {
     notifier.resetTickClock();
     final after = container.read(gameStateNotifierProvider).value!;
     expect(after, equals(before));
+  });
+
+  group('GameStateNotifier.buyUpgrade', () {
+    test('happy — golden_recipe_i alınır, crumbs düşer, owned set olur',
+        () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(gameStateNotifierProvider.future);
+
+      final notifier = container.read(gameStateNotifierProvider.notifier)
+        ..debugAddCrumbs(250);
+
+      final success = await notifier.buyUpgrade('golden_recipe_i');
+      expect(success, isTrue);
+
+      final gs = container.read(gameStateNotifierProvider).value!;
+      expect(gs.upgrades.owned['golden_recipe_i'], isTrue);
+      expect(gs.inventory.r1Crumbs, closeTo(50, 1e-9));
+    });
+
+    test('insufficient crumbs → returns false, state unchanged', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(gameStateNotifierProvider.future);
+
+      final notifier = container.read(gameStateNotifierProvider.notifier)
+        ..debugAddCrumbs(100);
+
+      final success = await notifier.buyUpgrade('golden_recipe_i');
+      expect(success, isFalse);
+      expect(
+        container.read(gameStateNotifierProvider).value!.upgrades.owned,
+        isEmpty,
+      );
+    });
+
+    test('unknown upgrade id → returns false, state unchanged', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(gameStateNotifierProvider.future);
+
+      final notifier = container.read(gameStateNotifierProvider.notifier)
+        ..debugAddCrumbs(10000);
+
+      final success = await notifier.buyUpgrade('ghost_upgrade_xyz');
+      expect(success, isFalse);
+    });
+
+    test('already owned → returns false, silent (no crumb re-charge)',
+        () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(gameStateNotifierProvider.future);
+
+      final notifier = container.read(gameStateNotifierProvider.notifier)
+        ..debugAddCrumbs(500);
+      await notifier.buyUpgrade('golden_recipe_i');
+      final before = container.read(gameStateNotifierProvider).value!;
+
+      final success = await notifier.buyUpgrade('golden_recipe_i');
+      expect(success, isFalse);
+      final after = container.read(gameStateNotifierProvider).value!;
+      expect(after.inventory.r1Crumbs, before.inventory.r1Crumbs);
+      expect(after.upgrades.owned, before.upgrades.owned);
+    });
+  });
+
+  group('GameStateNotifier — MultiplierChain injection', () {
+    test(
+        'productionRateProvider reflects chain — '
+        '1 Collector + Golden Recipe = 0.15', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(gameStateNotifierProvider.future);
+
+      final notifier = container.read(gameStateNotifierProvider.notifier)
+        ..debugAddCrumbs(500);
+      await notifier.buyBuilding('crumb_collector');
+      await notifier.buyUpgrade('golden_recipe_i');
+
+      final rate = container.read(productionRateProvider);
+      expect(rate, closeTo(0.15, 1e-9)); // 0.1 × 1.5
+    });
+
+    test('applyResumeDelta preserves upgrades (invariant #10)', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(gameStateNotifierProvider.future);
+
+      final notifier = container.read(gameStateNotifierProvider.notifier)
+        ..debugAddCrumbs(500);
+      await notifier.buyUpgrade('golden_recipe_i');
+      final before = container.read(gameStateNotifierProvider).value!;
+
+      notifier.applyResumeDelta(
+        now: DateTime.now().add(const Duration(seconds: 10)),
+      );
+      final after = container.read(gameStateNotifierProvider).value!;
+
+      expect(
+        after.upgrades.owned,
+        before.upgrades.owned,
+        reason: 'resume must not mutate upgrades',
+      );
+    });
+  });
+
+  group('GameStateNotifier — debugAddCrumbs helper', () {
+    test('debugAddCrumbs adds without side-effects', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(gameStateNotifierProvider.future);
+
+      container
+          .read(gameStateNotifierProvider.notifier)
+          .debugAddCrumbs(42);
+
+      expect(
+        container.read(gameStateNotifierProvider).value!.inventory.r1Crumbs,
+        42,
+      );
+    });
   });
 }
