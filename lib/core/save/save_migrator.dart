@@ -1,29 +1,53 @@
+import 'package:crumbs/core/save/checksum.dart';
+import 'package:crumbs/core/save/migrations/v1_to_v2.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
 
-/// Save version zinciri yönetimi.
-/// Spec: docs/save-format.md §6
+/// Migration orchestrator — raw Map'ten typed SaveEnvelope üretir.
 ///
-/// A kapsamı: v1 → v1 no-op (framework hazır).
-/// B'de migrator v1 → v2 eklenir (envelope typed GameState transition).
+/// Spec: docs/superpowers/specs/2026-04-17-sprint-b1-expansion-design.md §3.4
+/// Spec: docs/save-format.md §5
+///
+/// **Kural:** Migration HER ZAMAN raw map üzerinde koşar,
+/// `SaveEnvelope.fromJson` migration SONRASI çağrılır. Bu sayede freezed
+/// `@Default` fallback davranışına bağımlılık kırılır — her migration adımı
+/// yazılan explicit field'ı disk formatına işler.
 class SaveMigrator {
   const SaveMigrator._();
 
-  /// Envelope'u target version'a taşır. Future-version gelirse UnsupportedError
-  /// (kullanıcı yeni app sürümünü eski app'te açmaya çalıştı).
+  /// rawEnvelope: jsonDecode sonrası henüz typed yapılmamış Map.
+  /// Returns: typed SaveEnvelope at targetVersion, with fresh checksum.
+  /// Throws: [FormatException] if migration path yok.
   static SaveEnvelope migrate(
-    SaveEnvelope envelope, {
-    required int targetVersion,
-  }) {
-    if (envelope.version == targetVersion) return envelope;
-    if (envelope.version > targetVersion) {
-      throw UnsupportedError(
-        'Save version ${envelope.version} newer than app '
-        'version $targetVersion — downgrade not supported',
+    Map<String, dynamic> rawEnvelope,
+    int targetVersion,
+  ) {
+    final mutable = Map<String, dynamic>.from(rawEnvelope);
+    var currentVersion = mutable['version'] as int;
+
+    while (currentVersion < targetVersion) {
+      if (currentVersion == 1) {
+        final rawGs = mutable['gameState'] as Map<String, dynamic>;
+        mutable['gameState'] = migrateV1ToV2GameState(rawGs);
+        mutable['version'] = 2;
+        currentVersion = 2;
+      } else {
+        throw FormatException(
+          'No migration from v$currentVersion to v$targetVersion',
+        );
+      }
+    }
+
+    if (currentVersion > targetVersion) {
+      throw FormatException(
+        'No migration from v$currentVersion to v$targetVersion',
       );
     }
-    throw UnimplementedError(
-      'Migration chain ${envelope.version} → $targetVersion '
-      'henüz tanımlı değil',
+
+    final parsed = SaveEnvelope.fromJson(mutable);
+
+    // Migration sonrası yeni payload için fresh checksum
+    return parsed.copyWith(
+      checksum: Checksum.of(parsed.gameState.toJson()),
     );
   }
 }

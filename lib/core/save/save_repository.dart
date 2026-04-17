@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:crumbs/core/feedback/save_recovery.dart';
 import 'package:crumbs/core/save/checksum.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
+import 'package:crumbs/core/save/save_migrator.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Save load sonucu — envelope + opsiyonel recovery sinyali.
@@ -15,13 +17,17 @@ class SaveLoadResult {
 
 /// _tryRead sonucu — okunabildi mi ve parse edilebildi mi ayrımı
 /// recovery sinyali için gereklidir (dosya var ama bozuk ≠ dosya yok).
+/// migrated flag: v1→v2 gibi raw migration yapıldı mı (load path silent re-save
+/// tetikler).
 class _ReadResult {
   const _ReadResult({
     required this.existed,
     this.envelope,
+    this.migrated = false,
   });
   final bool existed;
   final SaveEnvelope? envelope;
+  final bool migrated;
 }
 
 /// Disk I/O, atomik yazma, yedek rotasyon, corruption recovery.
@@ -39,6 +45,8 @@ class SaveRepository {
   static const _mainFileName = 'crumbs_save.json';
   static const _bakFileName = 'crumbs_save.json.bak';
   static const _tmpFileName = 'crumbs_save.json.tmp';
+
+  static const int _kTargetVersion = 2;
 
   static Future<String> _defaultDirectory() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -89,6 +97,10 @@ class SaveRepository {
 
     final mainRead = await _tryRead(main);
     if (mainRead.envelope != null) {
+      if (mainRead.migrated) {
+        // Silent v2 re-save — yeni disk formatına terfi.
+        unawaited(save(mainRead.envelope!));
+      }
       return SaveLoadResult(envelope: mainRead.envelope);
     }
 
@@ -120,8 +132,16 @@ class SaveRepository {
       return const _ReadResult(existed: false);
     }
     try {
-      final json = jsonDecode(raw) as Map<String, dynamic>;
-      final envelope = SaveEnvelope.fromJson(json);
+      final rawMap = jsonDecode(raw) as Map<String, dynamic>;
+      final version = rawMap['version'] as int;
+
+      if (version < _kTargetVersion) {
+        // Spec §3.4: migration raw Map üzerinde koşar, typed parse SONRA.
+        final migrated = SaveMigrator.migrate(rawMap, _kTargetVersion);
+        return _ReadResult(existed: true, envelope: migrated, migrated: true);
+      }
+
+      final envelope = SaveEnvelope.fromJson(rawMap);
       // NFR-2 / save-format.md §3: checksum mismatch = corruption → bak fallback.
       if (Checksum.of(envelope.gameState.toJson()) != envelope.checksum) {
         return const _ReadResult(existed: true);

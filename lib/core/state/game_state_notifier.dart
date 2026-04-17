@@ -9,13 +9,14 @@ import 'package:crumbs/core/preferences/onboarding_prefs.dart';
 import 'package:crumbs/core/save/checksum.dart';
 import 'package:crumbs/core/save/game_state.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
-import 'package:crumbs/core/save/save_migrator.dart';
 import 'package:crumbs/core/save/save_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-const int _kCurrentSchemaVersion = 1;
+/// Disk layer (SaveRepository) migration'ı v2'ye kadar zaten koşar.
+/// Envelope buraya ulaştığında targetVersion'daır — ek migration gereksiz.
+const int _kCurrentSchemaVersion = 2;
 
 /// UI sinyal kanalları.
 ///
@@ -71,11 +72,9 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     OfflineReport? offlineReport;
 
     if (loadResult.envelope != null) {
-      final migrated = SaveMigrator.migrate(
-        loadResult.envelope!,
-        targetVersion: _kCurrentSchemaVersion,
-      );
-      hydrated = migrated.gameState;
+      // SaveRepository.load raw-first migration'ı içinde koşar; envelope
+      // buraya hep target version (v2) typed şekilde ulaşır.
+      hydrated = loadResult.envelope!.gameState;
       final now = DateTime.now();
       offlineReport = OfflineProgress.compute(hydrated, now);
       hydrated = hydrated.copyWith(

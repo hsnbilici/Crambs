@@ -139,5 +139,37 @@ void main() {
       expect(result.envelope, isNull);
       expect(result.recovery, SaveRecoveryReason.bothCorruptedStartedFresh);
     });
+
+    test('v1 disk file → load returns v2 typed envelope + disk re-saved',
+        () async {
+      // Construct v1 format manually (no upgrades key)
+      final mainPath = '${tempDir.path}/crumbs_save.json';
+      final legacyGs = GameState.initial(
+        installId: 'legacy-user',
+        now: DateTime(2026, 4, 17, 12),
+      );
+      final legacyJsonMap = legacyGs.toJson()..remove('upgrades');
+      final v1Envelope = {
+        'version': 1,
+        'lastSavedAt': '2026-04-17T10:00:00.000',
+        'gameState': legacyJsonMap,
+        'checksum': 'legacy-hash-not-verified-for-v1',
+      };
+      File(mainPath).writeAsStringSync(jsonEncode(v1Envelope));
+
+      final result = await repo.load();
+      expect(result.envelope, isNotNull);
+      expect(result.envelope!.version, 2);
+      expect(result.envelope!.gameState.upgrades.owned, isEmpty);
+      expect(result.envelope!.gameState.meta.installId, 'legacy-user');
+      expect(result.recovery, isNull);
+
+      // Allow silent re-save (unawaited future) to complete
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final rewritten = jsonDecode(File(mainPath).readAsStringSync())
+          as Map<String, dynamic>;
+      expect(rewritten['version'], 2);
+    });
   });
 }
