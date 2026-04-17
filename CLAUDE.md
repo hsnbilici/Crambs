@@ -61,6 +61,11 @@ flutter test --update-goldens
 # bu adım çalışmadan resolve olmaz.
 dart run build_runner build --delete-conflicting-outputs
 
+# L10n codegen (flutter pub get otomatik tetikler; manuel gerektiğinde):
+# flutter gen-l10n
+# Kullanım: AppStrings.of(context).tapHint
+# Import:   package:crumbs/l10n/app_strings.dart
+
 # Statik analiz (lint + typecheck — Dart tek geçişte yapar)
 flutter analyze
 
@@ -90,6 +95,10 @@ flutter build apk --release
 - `docs/ci-plan.md` ✓ — GitHub Actions workflow şablonları
 - `docs/visual-design.md` ✓ — görsel kimlik brief'i (hex YOK, tasarımcı kesinleştirir)
 
+**Sprint dokümanları** (brainstorming + writing-plans workflow):
+- `docs/superpowers/specs/` — brainstorming çıktısı design doc'ları (YYYY-MM-DD-<feature>-design.md)
+- `docs/superpowers/plans/` — implementation plan'ları (subagent-driven akış için)
+
 Yeni zorunlu doc eklenirse bu liste ve PRD §16.1 birlikte güncellenir.
 
 ## 5. Dizin yapısı
@@ -101,8 +110,11 @@ lib/
   core/
     economy/        # tüm formül ve hesaplamalar
     progression/    # unlock ve prerequisite mantığı
-    save/           # serialize / deserialize / migration
+    save/           # serialize / deserialize / migration + checksum
     events/         # event spawn, timer, buff hesabı
+    state/          # GameStateNotifier + derived providers (cross-feature)
+    preferences/    # SharedPreferences-backed Notifier'lar (onboarding vb.)
+    feedback/       # UI sinyal modelleri (OfflineReport, SaveRecoveryReason)
   features/
     home/
     shop/
@@ -113,9 +125,12 @@ lib/
   ui/
     components/
     theme/
+    format/         # TR locale fmt() + short scale
   app/
     routing/
     boot/
+    lifecycle/      # AppLifecycleGate (pause/resume/autosave)
+  l10n/             # tr.arb + gen-l10n çıktısı (AppStrings)
 test/               # flutter_test, mirror of lib/ structure
 integration_test/   # end-to-end flows
 ```
@@ -211,6 +226,11 @@ Yanlış uygulanması kolay olan noktalar:
 - **Premium bina, sert paywall, progression'ı bozan IAP YOK** (§8.9).
 - **Codegen sırası sabittir:** `pub get` → `dart run build_runner build` → `flutter analyze` → `flutter test`. Fresh clone'da codegen öncesi `flutter analyze` `uri_does_not_exist` verir — panik yok, build_runner'ı çalıştır.
 - **FVM pin uyarısı:** `.fvm/fvm_config.json` 3.41.5 pinli (Dart 3.11 bundle). Pubspec `sdk: ^3.8.0` istediği için daha eski Flutter (3.27 vs) reddedilir. FVM ile pin'e geç: `fvm use 3.41.5`.
+- **Riverpod 3.x breaking:** `StateProvider<T?>` deprecate oldu — `legacy.dart`'a taşındı. Yerine `NotifierProvider<TSignal, T?>` + `Notifier<T?>` subclass kullan (read API aynı; write: `ref.read(p.notifier).state = x`). `AsyncValue.valueOrNull` → `AsyncValue.value` rename'lendi.
+- **Lifecycle observer tercihi:** Flutter 3.13+ `AppLifecycleListener` (sadece ihtiyaç callback'leri — `onPause`/`onResume`/`onDetach`), `WidgetsBindingObserver.didChangeAppLifecycleState` switch'i YERİNE. `lib/app/lifecycle/app_lifecycle_gate.dart` bu pattern üzerine kurulu; paused→resumed direkt geçişi assert hatası verir (canonical `inactive → hidden → paused` zinciri gerekli — test yazarken dikkat).
+- **Save race lock:** `SaveRepository.save` içinde `Future<void>? _pending` while-loop ile serialize — 30s autosave timer + purchase sync + lifecycle pause çakışmalarını .bak rotation race'siz tutar. `dart:io` atomic rename (tmp→main) aynı filesystem'de garanti.
+- **Canonical JSON checksum niyet:** `lib/core/save/checksum.dart` `SplayTreeMap` key-sort (recursive, nested Map'ler dahil) + `sha256` hex. Amaç yalnız **corruption detection** (NFR-2); tamper resistance kapsam dışı (single-player offline). Anti-cheat gelirse HMAC + server secret'a geçilir, `Checksum.of` API surface korunur.
+- **OfflineReport push kuralı:** Cold start (`GameStateNotifier.build()` hydration) YALNIZCA — `applyResumeDelta` (hot resume) sessiz çalışır, `offlineReportProvider` / `saveRecoveryProvider` ikisini de push ETMEZ. Hot resume'da snackbar gösterilmez (ürpertici). Kural invariant-test ile korunur.
 
 ## 13. Açık sorulara alınan kararlar (PRD §19)
 Tüm sorular 2026-04-16 tarihinde karara bağlandı. Sayısal değerler playtest sonrası ayarlanabilir; `docs/economy.md §11` tek parametre kaynağıdır.
