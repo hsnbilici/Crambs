@@ -156,8 +156,11 @@ gameStateNotifierProvider    AsyncNotifier<GameState>
   ├─ tapCrumb()                       — sync, +1, haptic throttle, floating number spawn
   ├─ Future<bool> buyBuilding(id)     — true=success (sync save), false=insufficient
   ├─ applyProductionDelta(seconds)    — tick + offline common formula
-  ├─ Future<void> applyResumeDelta()  — onResume: offline progress since meta.lastSavedAt
-  │                                     + update lastSavedAt + optionally push OfflineReport
+  ├─ void applyResumeDelta()          — onResume: offline progress since meta.lastSavedAt
+  │                                     + update lastSavedAt. SYNC — disk save yok
+  │                                     (pause zaten persist etti, sonraki pause/30s timer
+  │                                     yeni state'i yazar). OfflineReport push ETMEZ —
+  │                                     yalnız cold start build hydration tetikler.
   └─ resetTickClock()                  — _lastTickAt = null; applyResumeDelta sonrası çağrılır
 
 onboardingPrefsProvider      Notifier<OnboardingPrefs>     SharedPreferences backed
@@ -195,10 +198,10 @@ AppLifecycleGate (ConsumerStatefulWidget wrapper)
     _listener = AppLifecycleListener(
       onPause:  () async => await _saveNow(),
       onDetach: () async => await _saveNow(),
-      onResume: () async {
+      onResume: () {
         final notifier = ref.read(gameStateNotifierProvider.notifier);
-        await notifier.applyResumeDelta();  // offline progress from meta.lastSavedAt
-        notifier.resetTickClock();            // warmup tick, _lastTickAt = null
+        notifier.applyResumeDelta();   // sync — offline progress from meta.lastSavedAt
+        notifier.resetTickClock();     // warmup tick, _lastTickAt = null
       },
     )
     _autoSaveTimer = Timer.periodic(30s, (_) async => await _saveNow())
@@ -214,7 +217,7 @@ Pause'da `_saveNow()` state'i diskle hizalar, `meta.lastSavedAt = pauseTime`. 5 
 
 Tick drift fix'iyle aynı kod yolu kullanılır (`Production.tickDelta`). Cold start (build) + hot resume aynı formülü çağırır — single source of truth.
 
-`applyResumeDelta` snackbar göstermez (hot resume'da "yokken kazandın" ürpertici). Sadece state'i günceller ve sessiz devam eder. `OfflineReport` yalnızca cold start'ta gösterilir.
+`applyResumeDelta` snackbar göstermez ve `OfflineReport` push **etmez** (hot resume'da "yokken kazandın" ürpertici). Sadece state'i sync günceller ve sessiz devam eder. **`OfflineReport` yalnızca cold start (build hydration) path'inde tetiklenir — bu kural `game_state_notifier.dart` doc comment'ine de geçer.** B sprint'inde "bazen hot resume'da göstersek" refactor önerisi bu sertleştirme ile reddedilir.
 
 ---
 
@@ -303,6 +306,11 @@ void tapCrumb() {
   ));
   _spawnFloatingNumber(1);
   _triggerHaptic();  // 80ms throttled
+  // Onboarding hint dismiss — ilk tap hem +1 hem hint fade (pass-through)
+  final prefs = ref.read(onboardingPrefsProvider);
+  if (!prefs.hintDismissed) {
+    ref.read(onboardingPrefsProvider.notifier).dismissHint();
+  }
 }
 
 /// true: success (sessiz — idle UX spam yok), false: insufficient (UI shake + tooltip).
@@ -574,8 +582,7 @@ String fmt(double n) {
     // Overflow kontrolü: units tükendiyse hala n >= 1000 demektir
     if (n >= 1000) {
       // Bilimsel gösterim orijinal sayı üzerinden
-      return '${original.abs().toStringAsExponential(2).replaceAll('.', ',')}'
-             .replaceFirst(RegExp(r'^'), sign);
+      return '$sign${original.abs().toStringAsExponential(2).replaceAll('.', ',')}';
     }
     raw = '${n.toStringAsFixed(n >= 100 ? 1 : 2)}${units[tier - 1]}';
   }
@@ -587,7 +594,17 @@ String fmt(double n) {
 
 **Test matrisi ekle:** `1e42` → bilimsel notasyon (Dc'yi geçer), overflow branch coverage.
 
-**Test matrisi:** `0 → '0'`, `0.8 → '0,8'`, `9.2 → '9,2'`, `10 → '10'`, `42.7 → '42'`, `987 → '987'`, `1234 → '1,23K'`, `1e6 → '1,00M'`, `1.5e9 → '1,50B'`, `1e18 → Dc civarı`, `1e42 → scientific fallback`, `-1500 → '-1,50K'`, `NaN → '—'`, `infinity → '—'`.
+**Test matrisi:** `0 → '0'`, `0.8 → '0,8'`, `9.2 → '9,2'`, `10 → '10'`, `42.7 → '42'`, `987 → '987'`, `1234 → '1,23K'`, `1e6 → '1,00M'`, `1.5e9 → '1,50B'`, `1e18 → '1,00Qi'`, `1e33 → '1,00Dc'`, `1e42 → bilimsel fallback '1,00e+42'`, `-1500 → '-1,50K'`, `NaN → '—'`, `infinity → '—'`.
+
+**Tier referans tablosu** (test yazarken):
+| Unit | Exponent | Unit | Exponent |
+|---|---|---|---|
+| K | 1e3 | Sx | 1e21 |
+| M | 1e6 | Sp | 1e24 |
+| B | 1e9 | Oc | 1e27 |
+| T | 1e12 | No | 1e30 |
+| Qa | 1e15 | Dc | 1e33 |
+| Qi | 1e18 | >Dc | scientific |
 
 ### 4.5 L10n (gen-l10n + intl)
 
@@ -665,11 +682,19 @@ State management: `floatingNumbersProvider` (`StateNotifier<List<FloatingNumber>
 ### 4.7 Onboarding hint
 
 ```dart
-// OnboardingHint widget
-// Absolute positioned overlay, dismissable on first tap anywhere.
-// On dismiss:
-//   ref.read(onboardingPrefsProvider.notifier).dismissHint()
-//     → SharedPreferences.setBool('hint_dismissed', true)
+// OnboardingHint — IgnorePointer(ignoring: true) wrapper'da render edilir.
+// Kendi tap handler'ı YOK. Tap event'i altındaki TapArea'ya pass-through geçer.
+//
+// Dismiss logic TapArea.onTap içinde (game_state_notifier.dart tapCrumb):
+//   void tapCrumb() {
+//     // ... +1 Crumb mutation ...
+//     if (ref.read(onboardingPrefsProvider).hintDismissed == false) {
+//       ref.read(onboardingPrefsProvider.notifier).dismissHint();
+//     }
+//   }
+//
+// Sonuç: ilk tap hem hint'i kapatır (AnimatedOpacity fade 300ms) hem +1 Crumb
+// üretir. İkinci tap sadece +1. PRD §1 "ilk 30 saniyede anlaşılır" ilkesi ile hizalı.
 // Render conditional: ref.watch(onboardingPrefsProvider).hintDismissed == false
 ```
 
@@ -759,7 +784,7 @@ State management: `floatingNumbersProvider` (`StateNotifier<List<FloatingNumber>
 | 14 | **Derived providers:** `currentCrumbsProvider`, `productionRateProvider`, `costCurveProvider.family` (core/state) + `floatingNumbersProvider` (features/home) | C | `lib/core/state/providers.dart`, `lib/features/home/providers.dart` |
 | 15 | **Number formatter `fmt()`** + TR locale + full test matrix | S | `lib/ui/format/number_format.dart` |
 | 16 | **AppTheme.artisan:** Material 3 seed + tabularFigures + light/dark | C | `lib/ui/theme/app_theme.dart` |
-| 17 | **Common widgets:** CrumbCounterHeader, TapArea, BuildingRow (+shake), FloatingNumberOverlay, OnboardingHint, AppNavigationBar (5-slot + More BottomSheet) | C | `lib/features/home/widgets/*`, `lib/features/shop/widgets/*` |
+| 17 | **Common widgets:** CrumbCounterHeader, TapArea, BuildingRow (`StatefulWidget` + local shake AnimationController — Fix #8 B-ready pattern), FloatingNumberOverlay, OnboardingHint (`IgnorePointer` pass-through — Fix #16; dismiss logic tapCrumb içinde), AppNavigationBar (5-slot + More BottomSheet) | C | `lib/features/home/widgets/*`, `lib/features/shop/widgets/*` |
 | 18 | **HomePage:** composition + `ref.listen` side-effects (offlineReport, saveRecovery snackbars) | C | `lib/features/home/home_page.dart` |
 | 19 | **ShopPage:** Crumb Collector row + buy flow | C | `lib/features/shop/shop_page.dart` |
 | 20 | **AppRouter:** home + shop + settings routes + nav lock snackbar handler | C | `lib/app/routing/app_router.dart` |
