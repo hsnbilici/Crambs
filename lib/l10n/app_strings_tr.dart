@@ -77,9 +77,6 @@ class AppStringsTr extends AppStrings {
   String get navSettings => 'Ayarlar';
 
   @override
-  String get navLockUpgradesA => 'Sonraki güncellemede açılır';
-
-  @override
   String get navLockResearch => '15-30 dakika oyun sonrası açılır';
 
   @override

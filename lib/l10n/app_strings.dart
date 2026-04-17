@@ -214,12 +214,6 @@ abstract class AppStrings {
   /// **'Ayarlar'**
   String get navSettings;
 
-  /// No description provided for @navLockUpgradesA.
-  ///
-  /// In tr, this message translates to:
-  /// **'Sonraki güncellemede açılır'**
-  String get navLockUpgradesA;
-
   /// No description provided for @navLockResearch.
   ///
   /// In tr, this message translates to:
