@@ -53,8 +53,9 @@ void main() {
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(gameStateNotifierProvider.future);
-    expect(container.read(costCurveProvider(('crumb_collector', 0))), 10);
-    expect(container.read(costCurveProvider(('crumb_collector', 1))), 11);
+    expect(container.read(costCurveProvider(('crumb_collector', 0))), 15);
+    // 15 × 1.12 = 16.8 → floor 16
+    expect(container.read(costCurveProvider(('crumb_collector', 1))), 16);
     expect(container.read(costCurveProvider(('unknown', 0))), 0);
   });
 }

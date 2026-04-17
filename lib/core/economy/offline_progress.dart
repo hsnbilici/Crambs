@@ -8,11 +8,16 @@ import 'package:crumbs/core/save/game_state.dart';
 class OfflineProgress {
   const OfflineProgress._();
 
-  /// A: 24 saat cap — shock-value snackbar'ı engeller.
-  /// B'de Duration(hours: 12). Tek satır const değişim.
-  static const Duration _kOfflineCap = Duration(hours: 24);
+  /// B1'den itibaren 12 saat cap — shock-value snackbar'ı engeller.
+  /// A'da 24h idi; B1'de economy playtest kararı ile 12h'a indirildi
+  /// (spec §1.1 in-scope).
+  static const Duration _kOfflineCap = Duration(hours: 12);
 
-  static OfflineReport compute(GameState state, DateTime now) {
+  static OfflineReport compute(
+    GameState state,
+    DateTime now, {
+    double globalMultiplier = 1.0,
+  }) {
     final last = DateTime.parse(state.meta.lastSavedAt);
     final rawElapsed = now.difference(last);
     final capped = rawElapsed > _kOfflineCap;
@@ -20,6 +25,7 @@ class OfflineProgress {
     final earned = Production.tickDelta(
       state.buildings.owned,
       effective.inMicroseconds / 1e6,
+      globalMultiplier: globalMultiplier,
     );
     return OfflineReport(
       earned: earned,

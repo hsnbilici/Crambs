@@ -214,12 +214,6 @@ abstract class AppStrings {
   /// **'Ayarlar'**
   String get navSettings;
 
-  /// No description provided for @navLockUpgradesA.
-  ///
-  /// In tr, this message translates to:
-  /// **'Sonraki güncellemede açılır'**
-  String get navLockUpgradesA;
-
   /// No description provided for @navLockResearch.
   ///
   /// In tr, this message translates to:
@@ -249,6 +243,54 @@ abstract class AppStrings {
   /// In tr, this message translates to:
   /// **'Ayarlar yakında eklenecek'**
   String get settingsPlaceholder;
+
+  /// No description provided for @goldenRecipeIName.
+  ///
+  /// In tr, this message translates to:
+  /// **'Altın Tarif I'**
+  String get goldenRecipeIName;
+
+  /// No description provided for @goldenRecipeIDescription.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tüm üretim × 1.5'**
+  String get goldenRecipeIDescription;
+
+  /// No description provided for @upgradeOwnedBadge.
+  ///
+  /// In tr, this message translates to:
+  /// **'Sahip ✓'**
+  String get upgradeOwnedBadge;
+
+  /// No description provided for @ovenName.
+  ///
+  /// In tr, this message translates to:
+  /// **'Fırın'**
+  String get ovenName;
+
+  /// No description provided for @bakeryLineName.
+  ///
+  /// In tr, this message translates to:
+  /// **'Fırıncılık Hattı'**
+  String get bakeryLineName;
+
+  /// No description provided for @errorScreenTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Beklenmedik bir hata'**
+  String get errorScreenTitle;
+
+  /// No description provided for @errorScreenBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Oyun başlatılamadı. Tekrar denemek ister misin?'**
+  String get errorScreenBody;
+
+  /// No description provided for @errorScreenRetry.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tekrar dene'**
+  String get errorScreenRetry;
 }
 
 class _AppStringsDelegate extends LocalizationsDelegate<AppStrings> {

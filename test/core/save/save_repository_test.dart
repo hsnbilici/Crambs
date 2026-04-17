@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crumbs/core/feedback/save_recovery.dart';
 import 'package:crumbs/core/save/checksum.dart';
+import 'package:crumbs/core/save/game_state.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
 import 'package:crumbs/core/save/save_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,14 +22,17 @@ void main() {
   });
 
   /// Valid envelope — checksum matches gameState by default; override `tag`
-  /// to mark different versions across tests without breaking verification.
+  /// to mark different versions across tests (installId carries the tag).
   SaveEnvelope sampleEnvelope({String tag = 'v'}) {
-    final gs = <String, dynamic>{'x': 1, 'tag': tag};
+    final gs = GameState.initial(
+      installId: 'test-$tag',
+      now: DateTime(2026, 4, 17, 12),
+    );
     return SaveEnvelope(
-      version: 1,
+      version: 2,
       lastSavedAt: '2026-04-17T12:00:00.000',
       gameState: gs,
-      checksum: Checksum.of(gs),
+      checksum: Checksum.of(gs.toJson()),
     );
   }
 
@@ -46,14 +50,14 @@ void main() {
       final bak = File('${tempDir.path}/crumbs_save.json.bak');
       expect(main.existsSync(), isTrue);
       expect(bak.existsSync(), isTrue);
-      final mainJson =
-          jsonDecode(main.readAsStringSync()) as Map<String, dynamic>;
-      final bakJson =
-          jsonDecode(bak.readAsStringSync()) as Map<String, dynamic>;
-      final mainGs = mainJson['gameState'] as Map<String, dynamic>;
-      final bakGs = bakJson['gameState'] as Map<String, dynamic>;
-      expect(mainGs['tag'], 'second');
-      expect(bakGs['tag'], 'first');
+      final mainEnv = SaveEnvelope.fromJson(
+        jsonDecode(main.readAsStringSync()) as Map<String, dynamic>,
+      );
+      final bakEnv = SaveEnvelope.fromJson(
+        jsonDecode(bak.readAsStringSync()) as Map<String, dynamic>,
+      );
+      expect(mainEnv.gameState.meta.installId, 'test-second');
+      expect(bakEnv.gameState.meta.installId, 'test-first');
     });
 
     test('concurrent saves serialized (no race)', () async {
@@ -64,10 +68,13 @@ void main() {
       await Future.wait(futures);
       final main = File('${tempDir.path}/crumbs_save.json');
       expect(main.existsSync(), isTrue);
-      final mainJson =
-          jsonDecode(main.readAsStringSync()) as Map<String, dynamic>;
-      final gs = mainJson['gameState'] as Map<String, dynamic>;
-      expect((gs['tag'] as String).startsWith('save-'), isTrue);
+      final mainEnv = SaveEnvelope.fromJson(
+        jsonDecode(main.readAsStringSync()) as Map<String, dynamic>,
+      );
+      expect(
+        mainEnv.gameState.meta.installId.startsWith('test-save-'),
+        isTrue,
+      );
     });
   });
 
@@ -82,7 +89,7 @@ void main() {
       await repo.save(sampleEnvelope());
       final result = await repo.load();
       expect(result.envelope, isNotNull);
-      expect(result.envelope!.version, 1);
+      expect(result.envelope!.version, 2);
       expect(result.recovery, isNull);
     });
 
@@ -101,11 +108,15 @@ void main() {
       await repo.save(sampleEnvelope(tag: 'bak'));
       await repo.save(sampleEnvelope(tag: 'main-orig'));
       final mainPath = '${tempDir.path}/crumbs_save.json';
+      final tamperedGs = GameState.initial(
+        installId: 'tampered',
+        now: DateTime(2026, 4, 17, 12),
+      );
       File(mainPath).writeAsStringSync(
         jsonEncode({
-          'version': 1,
+          'version': 2,
           'lastSavedAt': '2026-04-17T12:00:00.000',
-          'gameState': {'tampered': true},
+          'gameState': tamperedGs.toJson(),
           'checksum': 'deadbeef' * 8, // 64 hex but not the real hash
         }),
       );
@@ -113,8 +124,8 @@ void main() {
       expect(result.envelope, isNotNull);
       expect(result.recovery, SaveRecoveryReason.checksumFailedUsedBackup);
       expect(
-        result.envelope!.gameState['tag'],
-        'bak',
+        result.envelope!.gameState.meta.installId,
+        'test-bak',
         reason: 'must restore from .bak, not the tampered main',
       );
     });
@@ -127,6 +138,38 @@ void main() {
       final result = await repo.load();
       expect(result.envelope, isNull);
       expect(result.recovery, SaveRecoveryReason.bothCorruptedStartedFresh);
+    });
+
+    test('v1 disk file → load returns v2 typed envelope + disk re-saved',
+        () async {
+      // Construct v1 format manually (no upgrades key)
+      final mainPath = '${tempDir.path}/crumbs_save.json';
+      final legacyGs = GameState.initial(
+        installId: 'legacy-user',
+        now: DateTime(2026, 4, 17, 12),
+      );
+      final legacyJsonMap = legacyGs.toJson()..remove('upgrades');
+      final v1Envelope = {
+        'version': 1,
+        'lastSavedAt': '2026-04-17T10:00:00.000',
+        'gameState': legacyJsonMap,
+        'checksum': 'legacy-hash-not-verified-for-v1',
+      };
+      File(mainPath).writeAsStringSync(jsonEncode(v1Envelope));
+
+      final result = await repo.load();
+      expect(result.envelope, isNotNull);
+      expect(result.envelope!.version, 2);
+      expect(result.envelope!.gameState.upgrades.owned, isEmpty);
+      expect(result.envelope!.gameState.meta.installId, 'legacy-user');
+      expect(result.recovery, isNull);
+
+      // Allow silent re-save (unawaited future) to complete
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final rewritten = jsonDecode(File(mainPath).readAsStringSync())
+          as Map<String, dynamic>;
+      expect(rewritten['version'], 2);
     });
   });
 }

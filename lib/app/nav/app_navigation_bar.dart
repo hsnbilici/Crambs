@@ -19,7 +19,7 @@ class AppNavigationBar extends StatelessWidget {
       case NavSection.shop:
         context.go('/shop');
       case NavSection.upgrades:
-        _snack(context, AppStrings.of(context)!.navLockUpgradesA);
+        context.go('/upgrades');
       case NavSection.research:
         _snack(context, AppStrings.of(context)!.navLockResearch);
       case NavSection.more:
@@ -86,7 +86,7 @@ class AppNavigationBar extends StatelessWidget {
           label: s.navShop,
         ),
         NavigationDestination(
-          icon: const Icon(Icons.lock_outline),
+          icon: const Icon(Icons.auto_awesome),
           label: s.navUpgrades,
         ),
         NavigationDestination(

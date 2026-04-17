@@ -1,21 +1,25 @@
 import 'dart:async';
 
 import 'package:crumbs/core/economy/cost_curve.dart';
+import 'package:crumbs/core/economy/multiplier_chain.dart';
 import 'package:crumbs/core/economy/offline_progress.dart';
 import 'package:crumbs/core/economy/production.dart';
+import 'package:crumbs/core/economy/upgrade_defs.dart';
 import 'package:crumbs/core/feedback/offline_report.dart';
 import 'package:crumbs/core/feedback/save_recovery.dart';
 import 'package:crumbs/core/preferences/onboarding_prefs.dart';
 import 'package:crumbs/core/save/checksum.dart';
 import 'package:crumbs/core/save/game_state.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
-import 'package:crumbs/core/save/save_migrator.dart';
 import 'package:crumbs/core/save/save_repository.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-const int _kCurrentSchemaVersion = 1;
+/// Disk layer (SaveRepository) migration'ı v2'ye kadar zaten koşar.
+/// Envelope buraya ulaştığında targetVersion'daır — ek migration gereksiz.
+const int _kCurrentSchemaVersion = 2;
 
 /// UI sinyal kanalları.
 ///
@@ -71,13 +75,18 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     OfflineReport? offlineReport;
 
     if (loadResult.envelope != null) {
-      final migrated = SaveMigrator.migrate(
-        loadResult.envelope!,
-        targetVersion: _kCurrentSchemaVersion,
-      );
-      hydrated = GameState.fromJson(migrated.gameState);
+      // SaveRepository.load raw-first migration'ı içinde koşar; envelope
+      // buraya hep target version (v2) typed şekilde ulaşır.
+      hydrated = loadResult.envelope!.gameState;
       final now = DateTime.now();
-      offlineReport = OfflineProgress.compute(hydrated, now);
+      final multiplier = MultiplierChain.globalMultiplier(
+        hydrated.upgrades.owned,
+      );
+      offlineReport = OfflineProgress.compute(
+        hydrated,
+        now,
+        globalMultiplier: multiplier,
+      );
       hydrated = hydrated.copyWith(
         inventory: hydrated.inventory.copyWith(
           r1Crumbs: hydrated.inventory.r1Crumbs + offlineReport.earned,
@@ -150,14 +159,41 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
       ),
     );
     state = AsyncData(updated);
-    await _persist(updated);
+    _persistSafe(updated, 'buyBuilding');
+    return true;
+  }
+
+  /// Upgrade satın al. Fire-and-forget persist — purchase state UI immediate,
+  /// disk write async (race lock SaveRepository.save içinde).
+  /// Defensive branch'ler (exists, already owned) malformed state için;
+  /// production happy-path'te sadece cost gate çalışır.
+  Future<bool> buyUpgrade(String id) async {
+    final gs = state.value;
+    if (gs == null) return false;
+    if (!UpgradeDefs.exists(id)) return false;
+    if (gs.upgrades.owned[id] == true) return false;
+    final cost = UpgradeDefs.baseCostFor(id);
+    if (gs.inventory.r1Crumbs < cost) return false;
+    final updated = gs.copyWith(
+      inventory: gs.inventory.copyWith(r1Crumbs: gs.inventory.r1Crumbs - cost),
+      upgrades: gs.upgrades.copyWith(
+        owned: {...gs.upgrades.owned, id: true},
+      ),
+    );
+    state = AsyncData(updated);
+    _persistSafe(updated, 'buyUpgrade');
     return true;
   }
 
   void applyProductionDelta(double seconds) {
     final gs = state.value;
     if (gs == null) return;
-    final delta = Production.tickDelta(gs.buildings.owned, seconds);
+    final multiplier = MultiplierChain.globalMultiplier(gs.upgrades.owned);
+    final delta = Production.tickDelta(
+      gs.buildings.owned,
+      seconds,
+      globalMultiplier: multiplier,
+    );
     if (delta == 0) return;
     state = AsyncData(gs.copyWith(
       inventory: gs.inventory.copyWith(
@@ -168,6 +204,7 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
 
   /// Hot resume path — sync, sessiz.
   /// INVARIANT: NEITHER offlineReportProvider NOR saveRecoveryProvider changed.
+  /// INVARIANT (#10): upgrades map UNTOUCHED — copyWith only inventory + meta.
   void applyResumeDelta({DateTime? now}) {
     final gs = state.value;
     if (gs == null) return;
@@ -175,7 +212,12 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     final last = DateTime.parse(gs.meta.lastSavedAt);
     final seconds = n.difference(last).inMicroseconds / 1e6;
     if (seconds <= 0) return;
-    final delta = Production.tickDelta(gs.buildings.owned, seconds);
+    final multiplier = MultiplierChain.globalMultiplier(gs.upgrades.owned);
+    final delta = Production.tickDelta(
+      gs.buildings.owned,
+      seconds,
+      globalMultiplier: multiplier,
+    );
     state = AsyncData(gs.copyWith(
       inventory: gs.inventory.copyWith(
         r1Crumbs: gs.inventory.r1Crumbs + delta,
@@ -190,12 +232,11 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
 
   Future<void> _persist(GameState gs) async {
     final repo = ref.read(saveRepositoryProvider);
-    final json = gs.toJson();
     final envelope = SaveEnvelope(
       version: _kCurrentSchemaVersion,
       lastSavedAt: DateTime.now().toIso8601String(),
-      gameState: json,
-      checksum: Checksum.of(json),
+      gameState: gs,
+      checksum: Checksum.of(gs.toJson()),
     );
     await repo.save(envelope);
   }
@@ -204,6 +245,35 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     final gs = state.value;
     if (gs == null) return;
     await _persist(gs);
+  }
+
+  /// Fire-and-forget persist wrapper with visibility.
+  ///
+  /// Purchase flows (`buyBuilding`, `buyUpgrade`) use this so UI update is
+  /// immediate; disk write races on SaveRepository's internal lock and can't
+  /// collide. Error surface: debugPrint only (structured signalling deferred
+  /// to B2 telemetry wiring — spec §12 Followups).
+  void _persistSafe(GameState updated, String context) {
+    unawaited(
+      _persist(updated).catchError((Object e, StackTrace st) {
+        debugPrint('$context persist failed: $e\n$st');
+      }),
+    );
+  }
+
+  /// Test-only helper — T19 integration + buyUpgrade unit tests kullanır.
+  /// Production UI bu API'ye erişmez (@visibleForTesting).
+  @visibleForTesting
+  void debugAddCrumbs(double amount) {
+    final gs = state.value;
+    if (gs == null) return;
+    state = AsyncData(
+      gs.copyWith(
+        inventory: gs.inventory.copyWith(
+          r1Crumbs: gs.inventory.r1Crumbs + amount,
+        ),
+      ),
+    );
   }
 
   void _triggerHaptic() {
