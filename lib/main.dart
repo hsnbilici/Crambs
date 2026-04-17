@@ -11,11 +11,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<void> main() async {
-  final container = await AppBootstrap.initialize();
-  await container.read(onboardingPrefsProvider.notifier).ensureLoaded();
+  final boot = await AppBootstrap.initialize();
+  await boot.container
+      .read(onboardingPrefsProvider.notifier)
+      .ensureLoaded();
   runApp(
     UncontrolledProviderScope(
-      container: container,
+      container: boot.container,
       child: const AppLifecycleGate(child: CrumbsApp()),
     ),
   );
