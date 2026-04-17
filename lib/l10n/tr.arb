@@ -34,5 +34,13 @@
   "navLockEvents": "Yakında",
   "navLockPrestige": "Prestige koşulu sağlandığında açılır",
   "navLockCollection": "Yakında",
-  "settingsPlaceholder": "Ayarlar yakında eklenecek"
+  "settingsPlaceholder": "Ayarlar yakında eklenecek",
+  "goldenRecipeIName": "Altın Tarif I",
+  "goldenRecipeIDescription": "Tüm üretim × 1.5",
+  "upgradeOwnedBadge": "Sahip ✓",
+  "ovenName": "Fırın",
+  "bakeryLineName": "Fırıncılık Hattı",
+  "errorScreenTitle": "Beklenmedik bir hata",
+  "errorScreenBody": "Oyun başlatılamadı. Tekrar denemek ister misin?",
+  "errorScreenRetry": "Tekrar dene"
 }

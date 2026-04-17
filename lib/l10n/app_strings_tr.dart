@@ -93,4 +93,29 @@ class AppStringsTr extends AppStrings {
 
   @override
   String get settingsPlaceholder => 'Ayarlar yakında eklenecek';
+
+  @override
+  String get goldenRecipeIName => 'Altın Tarif I';
+
+  @override
+  String get goldenRecipeIDescription => 'Tüm üretim × 1.5';
+
+  @override
+  String get upgradeOwnedBadge => 'Sahip ✓';
+
+  @override
+  String get ovenName => 'Fırın';
+
+  @override
+  String get bakeryLineName => 'Fırıncılık Hattı';
+
+  @override
+  String get errorScreenTitle => 'Beklenmedik bir hata';
+
+  @override
+  String get errorScreenBody =>
+      'Oyun başlatılamadı. Tekrar denemek ister misin?';
+
+  @override
+  String get errorScreenRetry => 'Tekrar dene';
 }
