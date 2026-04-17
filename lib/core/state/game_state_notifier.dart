@@ -27,11 +27,15 @@ const int _kCurrentSchemaVersion = 1;
 class OfflineReportSignal extends Notifier<OfflineReport?> {
   @override
   OfflineReport? build() => null;
+
+  void clear() => state = null;
 }
 
 class SaveRecoverySignal extends Notifier<SaveRecoveryReason?> {
   @override
   SaveRecoveryReason? build() => null;
+
+  void clear() => state = null;
 }
 
 final offlineReportProvider =
