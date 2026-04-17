@@ -1,0 +1,86 @@
+import 'package:crumbs/core/economy/production.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('Production.baseProductionFor', () {
+    test('crumb_collector → 0.1 C/s', () {
+      expect(Production.baseProductionFor('crumb_collector'), 0.1);
+    });
+
+    test('unknown id → 0 (no exception)', () {
+      expect(Production.baseProductionFor('unknown'), 0);
+    });
+  });
+
+  group('Production.baseCostFor', () {
+    test('crumb_collector → 10', () {
+      expect(Production.baseCostFor('crumb_collector'), 10);
+    });
+
+    test('unknown id → 0', () {
+      expect(Production.baseCostFor('unknown'), 0);
+    });
+  });
+
+  group('Production.growthFor', () {
+    test('crumb_collector → 1.15', () {
+      expect(Production.growthFor('crumb_collector'), 1.15);
+    });
+
+    test('unknown id → 1.0 (flat)', () {
+      expect(Production.growthFor('unknown'), 1);
+    });
+  });
+
+  group('Production.totalPerSecond', () {
+    test('boş map → 0', () {
+      expect(Production.totalPerSecond({}), 0);
+    });
+
+    test('1 collector → 0.1', () {
+      expect(Production.totalPerSecond({'crumb_collector': 1}), 0.1);
+    });
+
+    test('5 collector → 0.5', () {
+      expect(
+        Production.totalPerSecond({'crumb_collector': 5}),
+        closeTo(0.5, 1e-12),
+      );
+    });
+
+    test('unknown building katkı vermez', () {
+      expect(
+        Production.totalPerSecond({'crumb_collector': 3, 'unknown': 10}),
+        closeTo(0.3, 1e-12),
+      );
+    });
+  });
+
+  group('Production.tickDelta', () {
+    test('1 collector × 1.0s = 0.1', () {
+      expect(
+        Production.tickDelta({'crumb_collector': 1}, 1),
+        closeTo(0.1, 1e-12),
+      );
+    });
+
+    test('0s delta = 0', () {
+      expect(Production.tickDelta({'crumb_collector': 5}, 0), 0);
+    });
+
+    test('lineer akkümülasyon: 5×(0.2s) ≈ 1×(1.0s) — relative tolerance', () {
+      final b = {'crumb_collector': 100};
+      final chunked = List.generate(5, (_) => Production.tickDelta(b, 0.2))
+          .reduce((a, c) => a + c);
+      final whole = Production.tickDelta(b, 1);
+      final diff = (chunked - whole).abs();
+      final maxAbs =
+          chunked.abs() > whole.abs() ? chunked.abs() : whole.abs();
+      final tolerance = 1e-12 * maxAbs;
+      expect(
+        diff,
+        lessThan(tolerance.isFinite && tolerance > 0 ? tolerance : 1e-9),
+      );
+    });
+  });
+}
