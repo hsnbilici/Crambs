@@ -109,4 +109,37 @@ void main() {
       expect(Production.growthFor('unknown'), 1);
     });
   });
+
+  group('Production — globalMultiplier injection', () {
+    test('totalPerSecond default multiplier = 1.0 (backward-compat)', () {
+      expect(Production.totalPerSecond({'crumb_collector': 1}), 0.1);
+    });
+
+    test('totalPerSecond with globalMultiplier: 1.5 → scaled', () {
+      expect(
+        Production.totalPerSecond(
+          {'crumb_collector': 1},
+          globalMultiplier: 1.5,
+        ),
+        closeTo(0.15, 1e-12),
+      );
+    });
+
+    test('tickDelta with globalMultiplier → delta scales', () {
+      expect(
+        Production.tickDelta(
+          {'oven': 2}, 10,
+          globalMultiplier: 1.5,
+        ),
+        closeTo(30, 1e-9),  // 2 × 1.0 × 1.5 × 10 = 30
+      );
+    });
+
+    test('tickDelta zero buildings → 0 regardless of multiplier', () {
+      expect(
+        Production.tickDelta({}, 10, globalMultiplier: 2),
+        0,
+      );
+    });
+  });
 }

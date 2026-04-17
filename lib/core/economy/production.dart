@@ -31,18 +31,26 @@ class Production {
         _ => 1,
       };
 
-  /// Toplam üretim hızı (C/s). UI + tick + offline tek noktadan besler.
-  static double totalPerSecond(Map<String, int> buildings) {
-    double total = 0;
+  /// Toplam üretim hızı (C/s). Multipliers chain dışarıdan enjekte edilir —
+  /// Production upgrade ID'lerine erişmez (CLAUDE.md §6/6).
+  static double totalPerSecond(
+    Map<String, int> buildings, {
+    double globalMultiplier = 1.0,
+  }) {
+    var total = 0.0;
     buildings.forEach((id, owned) {
       total += owned * baseProductionFor(id);
     });
-    return total;
+    return total * globalMultiplier;
   }
 
   /// Tick veya offline delta. seconds = wall-clock elapsed.
   /// Tek kod yolu — online tick + cold start hydration + hot resume ortak
   /// formül.
-  static double tickDelta(Map<String, int> buildings, double seconds) =>
-      totalPerSecond(buildings) * seconds;
+  static double tickDelta(
+    Map<String, int> buildings,
+    double seconds, {
+    double globalMultiplier = 1.0,
+  }) =>
+      totalPerSecond(buildings, globalMultiplier: globalMultiplier) * seconds;
 }
