@@ -45,13 +45,13 @@ void main() {
       expect(report.earned, closeTo(360, 1e-6));
     });
 
-    test('25h elapsed → capped at 24h', () {
+    test('13h elapsed → capped at 12h (B1 offline cap reduction)', () {
       final last = DateTime(2026, 4, 17, 12);
-      final now = last.add(const Duration(hours: 25));
+      final now = last.add(const Duration(hours: 13));
       final report = OfflineProgress.compute(stateWith(lastSavedAt: last), now);
-      // 24h × 0.1 C/s × 3600 = 8640
-      expect(report.earned, closeTo(8640, 1e-3));
-      expect(report.elapsed, const Duration(hours: 25));
+      // 12h × 0.1 C/s × 3600 = 4320
+      expect(report.earned, closeTo(4320, 1e-3));
+      expect(report.elapsed, const Duration(hours: 13));
       expect(report.capped, isTrue);
     });
 
