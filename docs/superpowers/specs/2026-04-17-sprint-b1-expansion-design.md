@@ -129,6 +129,7 @@ B1 yeni invariant'lar:
 8. **UpgradeState pure bool map:** `owned[id] == true` purchase marker; `false` ve absent semantik olarak denk (test'te iki durum da assert edilir)
 9. **Migration idempotency:** v1→v2 sonrası re-migration aynı state'i verir (test pin'li)
 10. **applyResumeDelta upgrade preserve:** pause/resume boyunca `gs.upgrades.owned` mutate olmaz (Sprint A invariant testine assert eklenir)
+11. **buyUpgrade already-owned defensive branch test-only:** UI `owned==true` durumunda button hiç render etmez (§6.1 — "Sahip ✓" badge) → production'da `buyUpgrade('owned_id')` çağrısı fiziksel olarak imkansız. Defensive `return false` pathway yalnız unit test'le kapsanır (§5.1), real user flow değil.
 
 ---
 
@@ -190,49 +191,80 @@ const factory SaveEnvelope({
 }) = _SaveEnvelope;
 ```
 
-- `SaveEnvelope.fromJson` artık `GameState.fromJson(json['gameState'])` çağırır — malformed data burada fail eder, `_tryRead`'in try/catch'i yakalar
+- `SaveEnvelope.fromJson` artık `GameState.fromJson(json['gameState'])` çağırır — **yalnız v2 için geçerli.** v1 disk verisinde `upgrades` key'i olmadığı için `GameState.fromJson(v1Map)` freezed `@Default(UpgradeState())` davranışına bağlıdır (JSON key missing → default devreye girer mi? freezed v3 dokümanına göre evet, ama bu garanti edilmiş tavuk-kasabası değil).
+- **Bu yüzden migration raw map üzerinde ÇAĞRI ÖNCESİ koşar** — bkz §3.4.
 - `SaveEnvelope.toJson` otomatik `gameState.toJson()` üretir (json_serializable)
 - Checksum: `Checksum.of(env.gameState.toJson())` — 2 call site (`save`, `_tryRead`)
 
-### 3.4 SaveMigrator v1→v2
+### 3.4 Load + Migration path (tek giriş, raw-first)
+
+**Doğru sıralama** — §3.3'teki belirsizliği kapar:
+
+```
+disk raw JSON (String)
+  → jsonDecode → Map<String, dynamic> rawEnvelope
+  → rawEnvelope['version'] oku (int)
+  → if version == 1:
+        rawGameState = rawEnvelope['gameState'] as Map (v1 yapısı — upgrades YOK)
+        migratedRawGameState = migrateV1ToV2(rawGameState)  // putIfAbsent('upgrades')
+        rawEnvelope['version'] = 2
+        rawEnvelope['gameState'] = migratedRawGameState
+        // artık rawEnvelope v2-şekilli
+  → SaveEnvelope.fromJson(rawEnvelope)
+        └── GameState.fromJson(rawEnvelope['gameState']) — upgrades artık mevcut
+  → checksum verify (Sprint A NFR-2 kuralı)
+  → if verify pass → return typed envelope
+  → else → return null (fallback to .bak)
+  → after successful load, if migration koştuysa:
+        SaveRepository.save(newlyTypedEnvelope) ile v2 formatında diske yeniden yaz (silent upgrade)
+```
+
+**Kritik invariant:** **Migration her zaman raw Map üzerinde çalışır**, `GameState.fromJson` migration sonrası çağrılır. `@Default(UpgradeState())` fallback davranışına GÜVENİLMEZ — explicit putIfAbsent ile upgrades key'i injecte edilir. Bu test'le pinlenir (Task #10).
 
 ```dart
 // lib/core/save/migrations/v1_to_v2.dart
 
-/// v1 → v2 migration (combined shape + upgrades addition).
-///
-/// Idempotent: rawMap içinde `upgrades` zaten varsa korunur.
-Map<String, dynamic> migrateV1ToV2(Map<String, dynamic> rawGameState) {
+/// v1 → v2 migration. Raw map üzerinde çalışır, typed cast yapmaz.
+/// Idempotent: `upgrades` zaten varsa dokunulmaz.
+Map<String, dynamic> migrateV1ToV2GameState(Map<String, dynamic> rawGameState) {
   final copy = Map<String, dynamic>.from(rawGameState);
   copy.putIfAbsent('upgrades', () => {'owned': <String, bool>{}});
   return copy;
 }
 ```
 
-**SaveMigrator.migrate** zincirine:
+**SaveMigrator.migrate** sorumluluğu:
 ```dart
-if (env.version == 1) {
-  final migratedMap = migrateV1ToV2(rawGameState);   // raw hala Map
-  final typedGameState = GameState.fromJson(migratedMap);
-  return SaveEnvelope(
-    version: 2,
-    lastSavedAt: env.lastSavedAt,
-    gameState: typedGameState,
-    checksum: Checksum.of(typedGameState.toJson()),
-  );
+/// rawEnvelope: jsonDecode sonrası henüz typed yapılmamış Map.
+/// Returns: typed SaveEnvelope at targetVersion.
+/// Throws: FormatException if targetVersion not reachable.
+SaveEnvelope migrate(Map<String, dynamic> rawEnvelope, int targetVersion) {
+  var mutable = Map<String, dynamic>.from(rawEnvelope);
+  var currentVersion = mutable['version'] as int;
+
+  while (currentVersion < targetVersion) {
+    if (currentVersion == 1) {
+      final rawGs = mutable['gameState'] as Map<String, dynamic>;
+      mutable['gameState'] = migrateV1ToV2GameState(rawGs);
+      mutable['version'] = 2;
+      currentVersion = 2;
+    } else {
+      throw FormatException('No migration from v$currentVersion to v$targetVersion');
+    }
+  }
+
+  // Artık mutable v${targetVersion}-şekilli → typed parse
+  return SaveEnvelope.fromJson(mutable);
 }
 ```
 
-**Not:** Migration typed envelope'a çıkarken raw map'ten tek seferlik geçiş yapar. Disk'ten okuma path'i:
+**Not:** Checksum değişmez (migration sonrası envelope'taki checksum yeni raw payload'ın hash'iyle eşleşmez artık). Bu yüzden migration sonrası bir adım daha var: **yeni checksum hesaplanır** (`Checksum.of(typedEnvelope.gameState.toJson())`) ve typed envelope yeni checksum'la `copyWith` edilir, sonra `SaveRepository.save` ile diske yeni v2 dosyası yazılır. Eski checksum kaybı kabul edilebilir çünkü v1 raw içeriğin bütünlüğü zaten verify edildi (jsonDecode + fromJson başarısı).
 
-```
-diskJSON (Map) → SaveEnvelope.fromJson
-  ├── version == 2 → typed GameState directly
-  └── version == 1 → _upgradeV1Envelope (internal helper): rawMap handling +
-      GameState.fromJson after putIfAbsent('upgrades')
-```
-
-Bu detay plan'da netleşecek (migration path typed envelope entry point'i ile çakışmaması için).
+Test zincirleri:
+- v1 raw Map → migrate → v2 typed envelope, `upgrades.owned == {}`
+- Idempotency: v2 envelope migrate → değişim yok
+- v1 disk file → `SaveRepository.load` → v2 envelope döner + disk'te v2 dosyası yazılır
+- Corrupted v1 (missing required field) → migration atar, `.bak` fallback tetiklenir
 
 ---
 
@@ -305,11 +337,17 @@ class MultiplierChain {
   /// economy.md §6 layer sequence — bu method katman 4 (global_multiplier).
   /// Diğer katmanlar (buildingSpecific, event, research, prestige) B1 scope
   /// dışı; şu an 1.0 dönen method stub'ları eklenmez — YAGNI.
+  ///
+  /// **Convention (B1 invariant):** `owned` map YALNIZCA true entry'leri tutar.
+  /// buyUpgrade `id: true` yazar, `false` veya `unset` arasında semantik fark
+  /// yoktur — ikisi de "satın alınmamış" demektir. Defensive branch'ler
+  /// (isOwned=false / unknown id) ancak malformed save data veya gelecek
+  /// migration hatalarına karşı savunmadır; production path'te tetiklenmez.
   static double globalMultiplier(Map<String, bool> owned) {
     var multiplier = 1.0;
     owned.forEach((id, isOwned) {
-      if (!isOwned) return;
-      if (!UpgradeDefs.exists(id)) return;   // defensive: unknown skip
+      if (!isOwned) return;                 // defensive: malformed save data
+      if (!UpgradeDefs.exists(id)) return;  // defensive: unknown upgrade id
       final effect = UpgradeDefs.effectFor(id);
       if (effect.type == EffectType.globalMultiplier) {
         multiplier *= effect.value;
@@ -400,8 +438,8 @@ static double growthFor(String id) => switch (id) {
 Future<bool> buyUpgrade(String id) async {
   final gs = state.value;
   if (gs == null) return false;
-  if (!UpgradeDefs.exists(id)) return false;
-  if (gs.upgrades.owned[id] == true) return false;   // idempotent
+  if (!UpgradeDefs.exists(id)) return false;        // defensive (test-only)
+  if (gs.upgrades.owned[id] == true) return false;  // idempotent (test-only per §2.4/11)
   final cost = UpgradeDefs.baseCostFor(id);
   if (gs.inventory.r1Crumbs < cost) return false;
 
@@ -667,17 +705,39 @@ B2 follow-up: gerçek hayatta AsyncError loop görülürse `retryCount` state + 
 
 ### 8.2 Integration test (update)
 
-`integration_test/app_test.dart` — cold start → tap → buy → upgrade round-trip:
+**Karar (flakiness/süre önlemi):** Integration test tap-spam'a dayanmaz, `@visibleForTesting` helper üzerinden kısa-yol alır. Production davranışı değişmez; testen kontrollü biriktirme.
+
+```dart
+// lib/core/state/game_state_notifier.dart — eklenir
+@visibleForTesting
+void debugAddCrumbs(double amount) {
+  final gs = state.value;
+  if (gs == null) return;
+  state = AsyncData(gs.copyWith(
+    inventory: gs.inventory.copyWith(
+      r1Crumbs: gs.inventory.r1Crumbs + amount,
+    ),
+  ));
+}
+```
+
+`@visibleForTesting` annotation `package:meta/meta.dart` → lib dosyalarından çağrılırsa lint warning. Test-only kullanım disipline zorlanır.
+
+`integration_test/app_test.dart`:
 
 ```dart
 testWidgets('cold start → tap → buy building → buy upgrade', (tester) async {
   await app.main();
   await tester.pumpAndSettle();
 
-  // 1 Crumb Collector alabilmek için 15 C gerekir
-  for (var i = 0; i < 20; i++) {
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(CrumbCounterHeader)),
+  );
+
+  // Tap ile 1 Collector alabileceğimiz 15 C'e kadar biriktir (15 tap)
+  for (var i = 0; i < 16; i++) {
     await tester.tap(find.byIcon(Icons.cookie));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 50));
   }
   await tester.pumpAndSettle();
 
@@ -687,11 +747,8 @@ testWidgets('cold start → tap → buy building → buy upgrade', (tester) asyn
   await tester.tap(find.byType(FilledButton).first);
   await tester.pumpAndSettle();
 
-  // ~200 C biriktir (collector passive + taps)
-  for (var i = 0; i < 200; i++) {
-    await tester.tap(find.byIcon(Icons.cookie));
-    await tester.pump(const Duration(milliseconds: 50));
-  }
+  // Golden Recipe I için gereken 200 C'yi helper ile inject (tap-spam YOK)
+  container.read(gameStateNotifierProvider.notifier).debugAddCrumbs(200);
   await tester.pumpAndSettle();
 
   // Upgrades → Golden Recipe I satın al
@@ -702,14 +759,13 @@ testWidgets('cold start → tap → buy building → buy upgrade', (tester) asyn
   await tester.pumpAndSettle();
 
   // Production rate provider assertion — 1 Collector × 1.5 = 0.15 C/s
-  final container = ProviderScope.containerOf(
-    tester.element(find.byType(CrumbCounterHeader)),
-  );
   expect(container.read(productionRateProvider), closeTo(0.15, 1e-9));
 });
 ```
 
-Not: "200 tap ile 200 C birikir" yaklaşımı 50ms pump ile gerçek test süresini 10+ sn yapar; alternatif: test container'a `GameStateNotifier.applyProductionDelta(200)` inject ile short-circuit. Plan aşamasında kararlaştırılır.
+**Test süresi:** ~16 tap × 50ms + birkaç pump ≈ 1 saniye. 200 tap senaryosu iptal.
+
+**Plan task not:** `debugAddCrumbs` helper'ı Task #11 (notifier) kapsamında eklenir, `@visibleForTesting` annotation ile import meta/meta.dart. Task #19 integration test bu helper'ı kullanır.
 
 ### 8.3 Coverage hedefleri (Sprint A ile aynı)
 
@@ -816,12 +872,15 @@ Sprint A invariant bundle'ına eklenecek:
 
 ### 10.2 Functional smoke
 
+**Manuel (cihaz/simülatör, ~2 dk total):**
 - [ ] **Cold boot:** Fresh install → Home ekranı → 3 bina Shop'ta görünür (Collector affordable, diğerleri gray)
 - [ ] **Upgrade visibility:** Upgrades tab unlock'lu (auto_awesome icon, snack yok) → Golden Recipe I listelenir
-- [ ] **Upgrade purchase:** 200 C biriktir → Golden Recipe I satın al → "Sahip ✓" badge görünür → `productionRateProvider` 1 Collector için 0.1 → 0.15 değişir
-- [ ] **Offline cap:** 13 saat kill → resume → OfflineReport `elapsed == 12h` (capped) — telemetry alanı B2'de bağlanacak; DoD'da assertion test'te
-- [ ] **Save migration:** v1 formatında manuel hazırlanmış JSON dosyası disk'e yaz → app cold start → v2 dosyası disk'te, upgrades alanı `{owned: {}}`, game state kaybı yok
-- [ ] **Error screen:** `AppBootstrap.initialize` test'te `Future.error` injection ile throw → ErrorScreen render → "Tekrar dene" tap → `ref.invalidate(gameStateNotifierProvider)` → tekrar deneniyor
+- [ ] **Upgrade purchase happy path:** Debug build'te `debugAddCrumbs(200)` ile 200 C inject → Golden Recipe I satın al → "Sahip ✓" badge görünür → C/s değeri önceden sonrasına %50 artmış görünür (fmt ekrandaki rate değeri)
+
+**Automated (manuel smoke DEĞİL — DoD kriteri bu testlerdir):**
+- [ ] **Offline cap test:** `OfflineProgress.compute(elapsed: 13h).elapsed == 12h` (unit test, §8.1 offline_progress_test.dart +1 case)
+- [ ] **Save migration test:** Test harness v1 JSON envelope construct eder → disk'e yazar → `SaveRepository.load` çağırır → v2 typed envelope döner, `upgrades.owned == {}`, game state kaybı yok; disk'e yeni v2 dosyası yazılmış (§8.1 save_repository_test.dart v1-to-v2 path case)
+- [ ] **Error screen test:** `AppBootstrap.initialize` stub'unda `Future.error` inject → CrumbsApp `.when(error:)` branch → ErrorScreen render → "Tekrar dene" tap → `ref.invalidate(gameStateNotifierProvider)` çağrıldı assertion (§8.1 error_screen_test.dart)
 
 ### 10.3 Non-functional
 
