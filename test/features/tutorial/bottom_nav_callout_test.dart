@@ -15,13 +15,13 @@ void main() {
                 left: 80,
                 child: SizedBox(key: key, width: 50, height: 50),
               ),
-              BottomNavCallout(targetKey: key, message: 'Dükkân\'a git'),
+              BottomNavCallout(targetKey: key, message: "Dükkân'a git"),
             ],
           ),
         ),
       ));
       await tester.pump();
-      expect(find.text('Dükkân\'a git'), findsOneWidget);
+      expect(find.text("Dükkân'a git"), findsOneWidget);
     });
 
     testWidgets('does not render modal barrier (navigation preserved)',
