@@ -1,4 +1,5 @@
 import 'package:crumbs/app/boot/app_bootstrap.dart';
+import 'package:crumbs/app/boot/firebase_bootstrap.dart';
 import 'package:crumbs/app/error/error_screen.dart';
 import 'package:crumbs/app/lifecycle/app_lifecycle_gate.dart';
 import 'package:crumbs/app/routing/app_router.dart';
@@ -11,6 +12,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseBootstrap.initialize(); // B3 — AppBootstrap ÖNCESİ
   final boot = await AppBootstrap.initialize();
   await boot.container
       .read(onboardingPrefsProvider.notifier)
