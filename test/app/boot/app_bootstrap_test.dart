@@ -33,4 +33,28 @@ void main() {
     expect(boot.container, isA<ProviderContainer>());
     boot.container.dispose();
   });
+
+  group('AppBootstrap — Crashlytics user identity (B3)', () {
+    test('initialize does not throw when FirebaseBootstrap not initialized',
+        () async {
+      // Test env: FirebaseBootstrap.initialize hiç çağrılmadı (veya phase 1
+      // fail → isInitialized=false). setUserIdentifier guard skip edilir.
+      SharedPreferences.setMockInitialValues({});
+
+      await expectLater(
+        () async {
+          final boot = await AppBootstrap.initialize(
+            containerFactory: () => ProviderContainer(overrides: [
+              saveRepositoryProvider.overrideWithValue(
+                SaveRepository(directoryProvider: () async => tempDir.path),
+              ),
+            ]),
+          );
+          addTearDown(boot.container.dispose);
+          return boot;
+        },
+        returnsNormally,
+      );
+    });
+  });
 }

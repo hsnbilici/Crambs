@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:crumbs/app/boot/firebase_bootstrap.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/core/telemetry/telemetry_providers.dart';
 import 'package:crumbs/core/tutorial/tutorial_notifier.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,6 +38,16 @@ class AppBootstrap {
     await container
         .read(installIdProvider.notifier)
         .adoptFromGameState(gs.meta.installId);
+
+    // B3 YENİ — step d' Crashlytics user identity
+    // fire-and-forget: platform channel roundtrip ~50-200ms boot'u bloklamaz.
+    // isInitialized guard: Firebase init fail'de silent skip.
+    if (FirebaseBootstrap.isInitialized) {
+      unawaited(
+        FirebaseCrashlytics.instance.setUserIdentifier(gs.meta.installId),
+      );
+    }
+
     final tutorialState =
         await container.read(tutorialNotifierProvider.future);
 
