@@ -41,5 +41,12 @@
   "bakeryLineName": "Fırıncılık Hattı",
   "errorScreenTitle": "Beklenmedik bir hata",
   "errorScreenBody": "Oyun başlatılamadı. Tekrar denemek ister misin?",
-  "errorScreenRetry": "Tekrar dene"
+  "errorScreenRetry": "Tekrar dene",
+  "tutorialStep1Message": "Crumb kazanmak için cupcake'e dokun!",
+  "tutorialStep2NavMessage": "Dükkân'a git ve ilk üreticini al",
+  "tutorialStep2ShopMessage": "Crumb Collector'ı satın al",
+  "tutorialStep3Title": "Neden Crumb kazanıyorsun?",
+  "tutorialStep3Body": "Binaların otomatik olarak saniyede Crumb üretir. Daha fazla satın al, daha hızlı büyü!",
+  "tutorialSkipButton": "Geç",
+  "tutorialCloseButton": "Anladım"
 }

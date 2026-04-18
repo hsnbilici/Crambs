@@ -4,17 +4,20 @@ import 'package:crumbs/app/lifecycle/app_lifecycle_gate.dart';
 import 'package:crumbs/app/routing/app_router.dart';
 import 'package:crumbs/core/preferences/onboarding_prefs.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
+import 'package:crumbs/features/tutorial/tutorial_scaffold.dart';
 import 'package:crumbs/l10n/app_strings.dart';
 import 'package:crumbs/ui/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<void> main() async {
-  final container = await AppBootstrap.initialize();
-  await container.read(onboardingPrefsProvider.notifier).ensureLoaded();
+  final boot = await AppBootstrap.initialize();
+  await boot.container
+      .read(onboardingPrefsProvider.notifier)
+      .ensureLoaded();
   runApp(
     UncontrolledProviderScope(
-      container: container,
+      container: boot.container,
       child: const AppLifecycleGate(child: CrumbsApp()),
     ),
   );
@@ -33,6 +36,9 @@ class CrumbsApp extends ConsumerWidget {
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         routerConfig: router,
+        builder: (ctx, child) => TutorialScaffold(
+          child: child ?? const SizedBox.shrink(),
+        ),
         localizationsDelegates: AppStrings.localizationsDelegates,
         supportedLocales: AppStrings.supportedLocales,
       ),

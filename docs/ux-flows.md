@@ -151,6 +151,33 @@ Deep link geldiğinde önce Home yüklenir, ardından hedef sekme veya ekran akt
 - Skip edilen tutorial sonrasında oyun tamamen işlevseldir; kilitli UI elemanı kalmaz.
 - Tutorial yalnızca `is_first_session == true` oturumunda gösterilir.
 
+### 4.4 Sprint B2 Implementation Detayları (route-aware Step 2)
+
+B2'de §4.2'deki 3 adım şu widget'lar üzerinden somutlaşır:
+
+1. **Step 1 — `tapCupcake`** (HomePage)
+   - `CoachMarkOverlay` + `HaloShape.circle` on `kTutorialCupcakeKey` (TapArea)
+   - Callout: "Crumb kazanmak için cupcake'e dokun!" + "Geç" skip
+   - Advance: `GameState.inventory.r1Crumbs` delta > 0 (fresh install'da 0 building → sadece user tap tetikler)
+
+2. **Step 2 — `openShop`** (route-aware, tek enum)
+   - `/` route'unda: `BottomNavCallout` — BottomNav "Dükkân" item'ı üstünde, modal barrier YOK (nav açık kalır)
+   - `/shop` route'unda: `CoachMarkOverlay` + `HaloShape.rectangle` on `kTutorialShopFirstRowKey` (ilk BuildingRow)
+   - Advance: `GameState.buildings.owned['crumb_collector']` artışı
+   - NOT: "shop'a git" vs "binayı al" granularity'si B3'e ertelendi (funnel analytics gerekirse split)
+
+3. **Step 3 — `explainCrumbs`** (ShopPage)
+   - `InfoCardOverlay` + modal barrier (background taps bloklanır)
+   - Title: "Neden Crumb kazanıyorsun?"
+   - Body: Binalar otomatik üretim mekanizması açıklaması
+   - CTA: "Anladım" → `tutorialCompleted=true`, `TutorialCompleted` event emit
+
+**Flicker guard [I11]:** `TutorialNotifier extends AsyncNotifier<TutorialState>`; `build()` SharedPreferences hydrate'ten önce overlay render edilmez (`tutorialActiveProvider.maybeWhen(data:, orElse: () => false)`).
+
+**Mount kontratı [I12]:** `TutorialScaffold` MUTLAKA `MaterialApp.router(builder: ...)` üzerinden mount edilir. Router tree context olmadan `GoRouterState.of(context)` fail eder (route-aware Step 2 çalışmaz).
+
+**Telemetri mapping (B2 stub):** §4.2 "tutorial_step_complete" + `tutorial_complete` event'leri B2 kapsamı dışı (tek kaynak analytics'e B3'te geçilir). B2 yalnızca `tutorial_started` + `tutorial_completed(skipped, durationMs)` emit eder — adım başı granüler event'ler B3 backlog.
+
 ---
 
 ## 5. Ekran Akışları

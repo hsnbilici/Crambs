@@ -1,7 +1,8 @@
-import 'package:crumbs/app/nav/app_navigation_bar.dart';
 import 'package:crumbs/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
+/// Shell dışı route. `More` bottom sheet'inden `context.push('/settings')`
+/// ile açılır — AppBar back button Navigator.canPop sayesinde otomatik gelir.
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -11,7 +12,6 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(s.navSettings)),
       body: Center(child: Text(s.settingsPlaceholder)),
-      bottomNavigationBar: const AppNavigationBar(currentIndex: 4),
     );
   }
 }

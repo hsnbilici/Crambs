@@ -15,9 +15,9 @@ MVP çekirdeği: tap loop → 8 bina → 30-40 upgrade → 12 research node → 
 Gerekçe: Idle oyun için yeterli performans, düşük öğrenme eğrisi, native bridge karmaşıklığı yok. Unity overkill, React Native'in game tick performans riski var.
 
 Sabitlenen alt bileşenler (scaffold PR sonrası `pubspec.yaml` tek gerçek kaynaktır):
-- **State management:** Riverpod 2.6 (+ `riverpod_annotation`, `riverpod_generator`, `riverpod_lint`).
+- **State management:** Riverpod 3.1 (+ `riverpod_annotation` 4.0, `riverpod_generator` 4.0, `riverpod_lint` 3.1).
 - **Save persist:** `path_provider` + JSON dosyası; `crypto` paketiyle SaveEnvelope SHA-256 checksum.
-- **Routing:** `go_router` 14.6.
+- **Routing:** `go_router` 17.2.
 - **Immutable state:** `freezed` + `json_serializable` (build_runner ile üretilir).
 - **Test:** `flutter_test` (unit + widget) + `integration_test` + `mocktail`.
 - **Analytics / Ads / IAP:** `firebase_analytics`, `google_mobile_ads`, `in_app_purchase` — paket eklendi; `flutterfire configure` ayrı runbook.
@@ -129,7 +129,9 @@ lib/
   app/
     routing/
     boot/
+    error/          # B1 T18 ErrorScreen — global error boundary
     lifecycle/      # AppLifecycleGate (pause/resume/autosave)
+    nav/            # Sprint A T17 AppNavigationBar
   l10n/             # tr.arb + gen-l10n çıktısı (AppStrings)
 test/               # flutter_test, mirror of lib/ structure
 integration_test/   # end-to-end flows
@@ -231,6 +233,13 @@ Yanlış uygulanması kolay olan noktalar:
 - **Save race lock:** `SaveRepository.save` içinde `Future<void>? _pending` while-loop ile serialize — 30s autosave timer + purchase sync + lifecycle pause çakışmalarını .bak rotation race'siz tutar. `dart:io` atomic rename (tmp→main) aynı filesystem'de garanti.
 - **Canonical JSON checksum niyet:** `lib/core/save/checksum.dart` `SplayTreeMap` key-sort (recursive, nested Map'ler dahil) + `sha256` hex. Amaç yalnız **corruption detection** (NFR-2); tamper resistance kapsam dışı (single-player offline). Anti-cheat gelirse HMAC + server secret'a geçilir, `Checksum.of` API surface korunur.
 - **OfflineReport push kuralı:** Cold start (`GameStateNotifier.build()` hydration) YALNIZCA — `applyResumeDelta` (hot resume) sessiz çalışır, `offlineReportProvider` / `saveRecoveryProvider` ikisini de push ETMEZ. Hot resume'da snackbar gösterilmez (ürpertici). Kural invariant-test ile korunur.
+- **MultiplierChain 3-site injection:** Upgrade satın alındıktan sonra yeni multiplier'ın etkili olması için chain **üç noktada** yeniden uygulanır: `tick()` (idle loop), `hydrate()` (cold start) ve `applyResumeDelta()` (hot resume). Bir site atlanırsa buy→tick arası stale-multiplier race oluşur. Invariant test: `test/core/economy/multiplier_chain_sites_test.dart`. Yeni bir "state'i ilerleten" metod eklerken chain uygulamayı unutma.
+- **SaveMigrator raw-first imza:** `SaveMigrator.migrate(Map<String, dynamic> rawEnvelope, int fromVersion)` — typed `SaveEnvelope` değil **ham JSON** alır. Gerekçe: v1 (untyped) → v2 (typed) geçişinde field rename/type değişimi typed model'e mapping'den ÖNCE çalışmalı; aksi halde `SaveEnvelope.fromJson` v1 payload'ı reddeder ve migration hiç çalışmaz. B1 T14 post-review düzeltmesi. Yeni migration step eklerken ham Map üzerinde çalıştığından emin ol.
+- **Fire-and-forget persist (`_persistSafe`):** `GameStateNotifier` içinde purchase/upgrade sonrası persist `_persistSafe(updated, 'context')` ile sarılır: `unawaited(_persist(g).catchError((e, st) => debugPrint(...)))`. UI latency'yi önlemek için **await edilmez**; silent fail 30s autosave timer ile telafi edilir. Error logging zorunlu (context string debug'da hangi kaynağın fail ettiğini gösterir). Yeni mutator eklerken doğrudan `_persist` çağırma — her zaman `_persistSafe` kullan.
+- **Tutorial AsyncNotifier pattern:** `TutorialNotifier extends AsyncNotifier<TutorialState>` (build() async SharedPreferences hydrate). Sync `Notifier + manual hydrate()` pattern'i flicker race üretir (UI completed=false default mount → hydrate sonrası completed=true flip). `tutorialActiveProvider` loading/error state'te false döner — UI overlay mount hydrate tamamlanana kadar gizli. Invariant [I11].
+- **Tutorial scaffold mount kontratı:** `TutorialScaffold` MUTLAKA `MaterialApp.router(builder: (ctx, child) => TutorialScaffold(child: child ?? SizedBox.shrink()))` üzerinden mount edilir. `MaterialApp` yukarısında veya router config olmadan mount edilirse `GoRouterState.of(context)` (route-aware Step 2) fail eder. Invariant [I12].
+- **InstallId GameState-wins reconciliation:** `installIdProvider` (SharedPreferences-backed) ve `GameState.meta.installId` boot sonrası senkron. Boot sırası: `ensureLoaded()` → `gameState hydrate` → `adoptFromGameState(gs.meta.installId)` — GameState authoritative; disk farklıysa disk overwrite edilir (save dosyası cross-device tek kaynak olduğu için). Telemetry payload'lar `resolveInstallIdForTelemetry(ref.read(installIdProvider))` üzerinden okunur — null ise `<not-loaded>` sentinel döner (invariant [I1], integration test bu sentinel'ı production emission'da reddeder).
+- **onPause sıra (session ordering):** `AppLifecycleGate._onPause` → `await persistNow()` ÖNCE, `sessionController.onPause()` SONRA. Gerekçe: pause sırasında süreç öldürülürse persist garanti edilmiş olmalı; telemetry SessionEnd kayıp kabul edilebilir. Invariant [I6]. `_autoSaveTimer` 30s → yalnız persist (telemetry tetiklemez).
 
 ## 13. Açık sorulara alınan kararlar (PRD §19)
 Tüm sorular 2026-04-16 tarihinde karara bağlandı. Sayısal değerler playtest sonrası ayarlanabilir; `docs/economy.md §11` tek parametre kaynağıdır.

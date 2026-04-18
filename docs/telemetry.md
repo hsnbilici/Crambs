@@ -275,3 +275,54 @@ Eski sürümler yeni event'leri göndermez; bu beklenen bir durumdur. Dashboard 
 | UX akışları (consent prompt tasarımı)         | `docs/ux-flows.md`              |
 | Ekonomi formülleri                            | `docs/economy.md`               |
 | Test senaryoları (event doğrulama)            | `docs/test-plan.md`             |
+
+---
+
+## Events (Sprint B2 — stub pipeline)
+
+All events emitted via `TelemetryLogger` interface. Default binding: `DebugLogger` (`debugPrint('[TELEMETRY] {name} {payload}')`). Firebase Analytics provider swap deferred to Sprint B3 (single-file replace at `telemetry_providers.dart`).
+
+### app_install
+Fired once on first cold launch (`firstLaunchMarked` was `false` before this session).
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | UUID from `GameState.meta.installId` (Sprint A) |
+| platform | String | `ios` or `android` (from `Platform.operatingSystem`) |
+
+### session_start
+Fired on every cold launch AND every `onResume` lifecycle event.
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | Non-null — `<not-loaded>` sentinel if provider unresolved (invariant I1 — integration test fails on this value in production) |
+| session_id | String | UUID v4, unique per session |
+
+### session_end
+Fired on `onPause` / `onDetach`, AFTER `persistNow` completes (ordering invariant I6).
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | Same rule as session_start |
+| session_id | String | Paired with corresponding session_start |
+| duration_ms | int | Milliseconds since matching session_start |
+
+### tutorial_started
+Fired once when `TutorialScaffold` postFrame callback triggers `TutorialNotifier.start()` and transitions to `tapCupcake`. No-op on subsequent launches (guarded by `firstLaunchMarked` pref).
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | Same rule |
+
+### tutorial_completed
+Fired when user completes Step 3 (`InfoCardOverlay` "Anladım" CTA) OR taps Skip (`CoachMarkOverlay` "Geç" — Step 1 only).
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | Same rule |
+| skipped | bool | `true` if user pressed Skip |
+| duration_ms | int | Time from `tutorial_started` to completion. **Note:** `0` when widget mid-tutorial remount occurs — downstream analytics may filter these edge cases |
+
+### Invariants
+- **[I1]** `install_id` never null in payload; sentinel `<not-loaded>` reserved for unresolved provider state (integration test rejects this value in production emission)
+- **[I6]** `onPause` ordering: `persistNow` ÖNCE, `SessionEnd` SONRA (process-kill during pause guarantees disk save; telemetry loss acceptable)
