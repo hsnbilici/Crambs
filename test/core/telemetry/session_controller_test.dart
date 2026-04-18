@@ -63,7 +63,7 @@ void main() {
       expect(logger.events.single, isA<SessionStart>());
     });
 
-    test('SessionStart carries non-null install_id', () async {
+    test('SessionStart carries non-null install_id + installIdAgeMs', () async {
       final logger = _FakeLogger();
       final c = buildContainer(logger);
       await c.read(installIdProvider.notifier).ensureLoaded();
@@ -74,6 +74,8 @@ void main() {
       final start = logger.events.single as SessionStart;
       expect(start.installId, 'test-id');
       expect(start.sessionId, isNotEmpty);
+      expect(start.installIdAgeMs, greaterThanOrEqualTo(0));
+      expect(start.installIdAgeMs, isNot(InstallIdNotifier.kAgeNotLoaded));
     });
   });
 
@@ -156,8 +158,11 @@ void main() {
   });
 
   group('SessionController — install_id not loaded sentinel', () {
-    test('emits <not-loaded> when installIdProvider null', () {
-      SharedPreferences.setMockInitialValues({}); // no install_id key
+    test('emits <not-loaded> + kAgeNotLoaded when ensureLoaded bypassed', () {
+      // ensureLoaded ÇAĞRILMADI — bypass bug senaryosunu simüle eder;
+      // hem install_id hem installIdAgeMs sentinel'ları propagate olmalı
+      // (integration test [I15] production'da bu değerleri reddeder).
+      SharedPreferences.setMockInitialValues({});
       final logger = _FakeLogger();
       final c = ProviderContainer(overrides: [
         telemetryLoggerProvider.overrideWithValue(logger),
@@ -169,6 +174,7 @@ void main() {
 
       final start = logger.events.single as SessionStart;
       expect(start.installId, '<not-loaded>');
+      expect(start.installIdAgeMs, InstallIdNotifier.kAgeNotLoaded);
     });
   });
 }

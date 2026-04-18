@@ -41,7 +41,13 @@ void main() {
 
     test('log() preserves event order across calls', () {
       DebugLogger()
-        ..log(const SessionStart(installId: 'a', sessionId: 's1'))
+        ..log(
+          const SessionStart(
+            installId: 'a',
+            sessionId: 's1',
+            installIdAgeMs: 0,
+          ),
+        )
         ..log(const TutorialStarted(installId: 'a'))
         ..log(
           const SessionEnd(
