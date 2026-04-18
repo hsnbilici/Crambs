@@ -1,4 +1,3 @@
-import 'package:crumbs/app/nav/app_navigation_bar.dart';
 import 'package:crumbs/core/feedback/save_recovery.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/features/home/widgets/crumb_counter_header.dart';
@@ -55,7 +54,6 @@ class HomePage extends ConsumerWidget {
           const OnboardingHint(),
         ],
       ),
-      bottomNavigationBar: const AppNavigationBar(currentIndex: 0),
     );
   }
 }

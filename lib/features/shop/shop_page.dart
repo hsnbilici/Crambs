@@ -1,4 +1,3 @@
-import 'package:crumbs/app/nav/app_navigation_bar.dart';
 import 'package:crumbs/features/shop/widgets/building_row.dart';
 import 'package:crumbs/features/tutorial/keys.dart';
 import 'package:crumbs/l10n/app_strings.dart';
@@ -23,7 +22,6 @@ class ShopPage extends StatelessWidget {
           BuildingRow(id: 'bakery_line', displayName: s.bakeryLineName),
         ],
       ),
-      bottomNavigationBar: const AppNavigationBar(currentIndex: 1),
     );
   }
 }
