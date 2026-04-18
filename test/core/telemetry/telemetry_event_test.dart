@@ -16,13 +16,25 @@ void main() {
 
   group('TelemetryEvent — SessionStart', () {
     test('eventName is session_start', () {
-      const e = SessionStart(installId: 'abc', sessionId: 'sess-1');
+      const e = SessionStart(
+        installId: 'abc',
+        sessionId: 'sess-1',
+        installIdAgeMs: 0,
+      );
       expect(e.eventName, 'session_start');
     });
 
-    test('payload has install_id and session_id', () {
-      const e = SessionStart(installId: 'abc', sessionId: 'sess-1');
-      expect(e.payload, {'install_id': 'abc', 'session_id': 'sess-1'});
+    test('payload has install_id, session_id, install_id_age_ms', () {
+      const e = SessionStart(
+        installId: 'abc',
+        sessionId: 'sess-1',
+        installIdAgeMs: 12345,
+      );
+      expect(e.payload, {
+        'install_id': 'abc',
+        'session_id': 'sess-1',
+        'install_id_age_ms': 12345,
+      });
     });
   });
 
