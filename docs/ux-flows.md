@@ -151,6 +151,33 @@ Deep link geldiğinde önce Home yüklenir, ardından hedef sekme veya ekran akt
 - Skip edilen tutorial sonrasında oyun tamamen işlevseldir; kilitli UI elemanı kalmaz.
 - Tutorial yalnızca `is_first_session == true` oturumunda gösterilir.
 
+### 4.4 Sprint B2 Implementation Detayları (route-aware Step 2)
+
+B2'de §4.2'deki 3 adım şu widget'lar üzerinden somutlaşır:
+
+1. **Step 1 — `tapCupcake`** (HomePage)
+   - `CoachMarkOverlay` + `HaloShape.circle` on `kTutorialCupcakeKey` (TapArea)
+   - Callout: "Crumb kazanmak için cupcake'e dokun!" + "Geç" skip
+   - Advance: `GameState.inventory.r1Crumbs` delta > 0 (fresh install'da 0 building → sadece user tap tetikler)
+
+2. **Step 2 — `openShop`** (route-aware, tek enum)
+   - `/` route'unda: `BottomNavCallout` — BottomNav "Dükkân" item'ı üstünde, modal barrier YOK (nav açık kalır)
+   - `/shop` route'unda: `CoachMarkOverlay` + `HaloShape.rectangle` on `kTutorialShopFirstRowKey` (ilk BuildingRow)
+   - Advance: `GameState.buildings.owned['crumb_collector']` artışı
+   - NOT: "shop'a git" vs "binayı al" granularity'si B3'e ertelendi (funnel analytics gerekirse split)
+
+3. **Step 3 — `explainCrumbs`** (ShopPage)
+   - `InfoCardOverlay` + modal barrier (background taps bloklanır)
+   - Title: "Neden Crumb kazanıyorsun?"
+   - Body: Binalar otomatik üretim mekanizması açıklaması
+   - CTA: "Anladım" → `tutorialCompleted=true`, `TutorialCompleted` event emit
+
+**Flicker guard [I11]:** `TutorialNotifier extends AsyncNotifier<TutorialState>`; `build()` SharedPreferences hydrate'ten önce overlay render edilmez (`tutorialActiveProvider.maybeWhen(data:, orElse: () => false)`).
+
+**Mount kontratı [I12]:** `TutorialScaffold` MUTLAKA `MaterialApp.router(builder: ...)` üzerinden mount edilir. Router tree context olmadan `GoRouterState.of(context)` fail eder (route-aware Step 2 çalışmaz).
+
+**Telemetri mapping (B2 stub):** §4.2 "tutorial_step_complete" + `tutorial_complete` event'leri B2 kapsamı dışı (tek kaynak analytics'e B3'te geçilir). B2 yalnızca `tutorial_started` + `tutorial_completed(skipped, durationMs)` emit eder — adım başı granüler event'ler B3 backlog.
+
 ---
 
 ## 5. Ekran Akışları
@@ -546,28 +573,49 @@ Detaylı akış için §6'ya bakınız.
 
 ---
 
-## §6. Tutorial (FR-3 — 3 step, route-aware Step 2)
+## 6. Session Recap Modal — Detaylı Akış
 
-1. **Step 1 — tapCupcake** (HomePage)
-   - Cupcake üzerinde pulse halo + "Crumb kazanmak için cupcake'e dokun!"
-   - Skip seçeneği: "Geç" → tutorial tamamen atlanır (all-or-nothing)
-   - Advance: ilk tap (`GameState.inventory.r1Crumbs` delta > 0 — fresh install'da 0 building olduğu için yalnız user tap tetikler)
+### 6.1 Trigger Koşulu
 
-2. **Step 2 — openShop** (route-aware, tek enum)
-   - Home'da iken: BottomNav "Dükkân" item'ı üstünde `BottomNavCallout` ("Dükkân'a git ve ilk üreticini al")
-   - ShopPage'e geçince (`/shop`): ilk building row (crumb_collector) üzerinde `CoachMarkOverlay` ("Crumb Collector'ı satın al")
-   - Advance: ilk binaya sahip olunca (`GameState.buildings.owned['crumb_collector']` artışı)
-   - NOT: "shop'a git" vs "binayı al" granularity'si B3'e ertelendi (tutorial funnel analytics için gerekirse split)
+| Koşul | Değer |
+|-------|-------|
+| Kaynak alanı | `RunState.lastActiveAt` (PRD §7.3) |
+| Eşik | `now - lastActiveAt > 60 sn` |
+| Gösterim zamanı | Home ekranı yüklendikten sonra, modal üstüne modal kuralı ihlal edilmeden |
+| Oturum başına gösterim | Tek seferlik; aynı cold start'ta ikinci kez gösterilmez |
 
-3. **Step 3 — explainCrumbs** (ShopPage)
-   - Bottom-centered `InfoCardOverlay` + modal barrier (background taps bloklanır)
-   - Title: "Neden Crumb kazanıyorsun?"
-   - Body: Binalar otomatik üretim mekanizması açıklaması
-   - CTA: "Anladım" → `tutorialCompleted=true`, `TutorialCompleted` event emit
+### 6.2 Akış Adımları
 
-**Flicker guard [I11]:** `TutorialNotifier extends AsyncNotifier<TutorialState>`; `build()` SharedPreferences hydrate'ten önce overlay render edilmez (`tutorialActiveProvider.maybeWhen(data: ..., orElse: () => false)`).
+1. Uygulama ön plana gelir → `session_start` gönderilir (`telemetry.md §4.1`)
+2. `lastActiveAt` değeri okunur; 60 sn eşiği aşılmışsa modal hazırlanır
+3. Home ekranı arka planda yüklenir (save okunur, production tick çalışır)
+4. Modal açılır → `session_recap_shown` event gönderilir (`offline_duration_ms`, `resource_earned_offline` — `telemetry.md §4.7`)
+5. Kaynak sayaç animasyonu çalışır — **maksimum 1,5 sn** (animasyon tamamlanmadan CTA'lar aktif olmayabilir; kullanıcı beklemeden kapatabilir)
+6. Modal içeriği gösterilir:
+   - "X Crumbs üretildi" (yokken üretilen)
+   - "En çok katkı: [Bina Adı]"
+   - Pasif çarpan değeri
+   - En verimli 3 aksiyon önerisi (buton veya kart)
+   - Yeni özellik unlock varsa "Yeni: [özellik adı]" bandı
+7. Oyuncu seçim yapar:
 
-**Mount kontratı [I12]:** `TutorialScaffold` MUTLAKA `MaterialApp.router(builder: ...)` üzerinden mount edilir. Router tree context olmadan `GoRouterState.of(context)` fail eder (route-aware Step 2 çalışmaz).
+| Aksiyon | Davranış | Telemetri (`telemetry.md §4.7`) |
+|---------|----------|----------------------------------|
+| "Topla" (Collect) | Modal kapanır, Home'daki sayaç güncellenir | `session_recap_action_taken` → `action_type: "collect"` (bkz. `docs/telemetry.md §4.7`) |
+| "Aksiyona Geç" (Take Action — önerilerden birine tap) | Modal kapanır, ilgili ekrana yönlendirilir | `session_recap_action_taken` → `action_type: "buy_building"` / `"buy_upgrade"` / `"open_shop"` |
+| "Kapat" (Dismiss — X veya dışarıya tap) | Modal kapanır, Home'da kalır | `session_recap_dismissed` |
+
+8. Modal kapandıktan sonra Home ekranı güncellenmiş kaynakla gösterilir
+
+### 6.3 Erişilebilirlik
+
+| Konu | Kural |
+|------|-------|
+| Screen reader | Modal platform erişilebilirlik katmanına (iOS VoiceOver, Android TalkBack) dahil edilir; başlık, içerik ve her CTA butonu ayrı semantic node olarak tanımlanır |
+| Focus yönetimi | Modal açılınca focus otomatik olarak modal başlığına taşınır; kapanınca önceki focus noktasına döner |
+| Animasyon | `prefers-reduced-motion` / low-motion mode aktifse sayaç animasyonu atlanır, son değer doğrudan gösterilir |
+| Renk | Önerilen aksiyonlar renk + ikon + metin üçlüsüyle gösterilir |
+| Dokunma hedefi | Her CTA butonu ≥44×44 pt |
 
 ---
 
