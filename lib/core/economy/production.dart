@@ -23,6 +23,12 @@ class Production {
         _ => 0,
       };
 
+  /// Returns true iff buildingId is a known catalog entry.
+  static bool exists(String buildingId) => switch (buildingId) {
+        'crumb_collector' || 'oven' || 'bakery_line' => true,
+        _ => false,
+      };
+
   /// Growth rate — cost(n) = base × growth^owned. economy.md §4.
   static double growthFor(String buildingId) => switch (buildingId) {
         'crumb_collector' => 1.12,

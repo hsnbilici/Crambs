@@ -12,6 +12,7 @@ import 'package:crumbs/core/save/checksum.dart';
 import 'package:crumbs/core/save/game_state.dart';
 import 'package:crumbs/core/save/save_envelope.dart';
 import 'package:crumbs/core/save/save_repository.dart';
+import 'package:crumbs/core/telemetry/telemetry_providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,6 +146,7 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
   Future<bool> buyBuilding(String id) async {
     final gs = state.value;
     if (gs == null) return false;
+    if (!Production.exists(id)) return false;
     final owned = gs.buildings.owned[id] ?? 0;
     final cost = CostCurve.costFor(
       Production.baseCostFor(id),
@@ -160,6 +162,16 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     );
     state = AsyncData(updated);
     _persistSafe(updated, 'buyBuilding');
+    // B4 YENİ — telemetry emit (successful path only, [I19])
+    // Emission _persistSafe sonrası sync; crash window %0.01 kabul,
+    // B5 analysis followup.
+    final ownedAfter = updated.buildings.owned[id] ?? 0;
+    ref.read(telemetryLoggerProvider).log(PurchaseMade(
+      installId: resolveInstallIdForTelemetry(ref.read(installIdProvider)),
+      buildingId: id,
+      cost: cost.toInt(),
+      ownedAfter: ownedAfter,
+    ));
     return true;
   }
 
@@ -182,6 +194,12 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     );
     state = AsyncData(updated);
     _persistSafe(updated, 'buyUpgrade');
+    // B4 YENİ
+    ref.read(telemetryLoggerProvider).log(UpgradePurchased(
+      installId: resolveInstallIdForTelemetry(ref.read(installIdProvider)),
+      upgradeId: id,
+      cost: cost.toInt(),
+    ));
     return true;
   }
 
