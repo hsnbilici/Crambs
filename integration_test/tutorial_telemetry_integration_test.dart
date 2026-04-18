@@ -1,3 +1,4 @@
+import 'package:crumbs/core/launch/first_boot_notifier.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/core/telemetry/telemetry_providers.dart';
 import 'package:crumbs/core/tutorial/tutorial_notifier.dart';
@@ -78,6 +79,12 @@ void main() {
         );
         expect(e.installIdAgeMs, greaterThanOrEqualTo(0));
       }
+
+      // B4 — TutorialStarted.isReplay=false (fresh install [I20])
+      final tutorialEvents = logger.events.whereType<TutorialStarted>();
+      expect(tutorialEvents, hasLength(1));
+      expect(tutorialEvents.single.isReplay, false,
+          reason: 'fresh install — not replay');
     });
 
     testWidgets('second cold start → no TutorialStarted', (tester) async {
@@ -141,6 +148,95 @@ void main() {
       final end = logger.events.whereType<SessionEnd>().single;
       expect(end.durationMs, greaterThanOrEqualTo(20));
       expect(end.installId, 'integ-test');
+    });
+
+    testWidgets(
+        'pre-B4 migration: install_id mevcut → no AppInstall emit [I18]',
+        (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'crumbs.install_id': 'pre-b4-install-uuid',
+        'crumbs.install_created_at': DateTime.now().toIso8601String(),
+      });
+      final logger = _CaptureLogger();
+      final c = ProviderContainer(overrides: [
+        telemetryLoggerProvider.overrideWithValue(logger),
+      ]);
+      addTearDown(c.dispose);
+
+      // Boot sim — FirstBootNotifier pre-B4 user detect → observed=false
+      await c.read(installIdProvider.notifier).ensureLoaded();
+      final isFirstLaunch =
+          await c.read(firstBootProvider.notifier).ensureObserved();
+      expect(isFirstLaunch, false, reason: 'pre-B4 backfill');
+
+      final gs = await c.read(gameStateNotifierProvider.future);
+      await c
+          .read(installIdProvider.notifier)
+          .adoptFromGameState(gs.meta.installId);
+      c
+          .read(sessionControllerProvider)
+          .onLaunch(isFirstLaunch: isFirstLaunch);
+
+      // [I18]: AppInstall emit edilmemeli
+      expect(logger.events.whereType<AppInstall>(), isEmpty,
+          reason: 'pre-B4 migration — AppInstall suppressed [I18]');
+
+      // SessionStart yine emit edilir (her launch'ta)
+      expect(logger.events.whereType<SessionStart>(), hasLength(1));
+    });
+
+    testWidgets(
+        'post-reset replay: TutorialStarted isReplay=true [I18]+[I20]',
+        (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'crumbs.install_id': 'test-id',
+        'crumbs.install_created_at': DateTime.now().toIso8601String(),
+        'crumbs.first_launch_observed': true,
+        'crumbs.first_launch_marked': true,
+        'crumbs.tutorial_completed': true,
+      });
+      final logger = _CaptureLogger();
+      final c = ProviderContainer(overrides: [
+        telemetryLoggerProvider.overrideWithValue(logger),
+      ]);
+      addTearDown(c.dispose);
+
+      // Boot sim — second launch (AppInstall edilmez, tutorial completed)
+      await c.read(installIdProvider.notifier).ensureLoaded();
+      await c.read(firstBootProvider.notifier).ensureObserved();
+      await c.read(gameStateNotifierProvider.future);
+      await c.read(tutorialNotifierProvider.future);
+      c
+          .read(sessionControllerProvider)
+          .onLaunch(isFirstLaunch: false);
+
+      logger.events.clear(); // pre-reset noise
+
+      // Reset → sonraki start isReplay=true
+      await c.read(tutorialNotifierProvider.notifier).reset();
+      final isReplay = c
+          .read(tutorialNotifierProvider.notifier)
+          .consumeReplayFlag();
+
+      // Simulate TutorialScaffold emission
+      if (isReplay) {
+        logger.log(TutorialStarted(
+          installId: resolveInstallIdForTelemetry(
+            c.read(installIdProvider),
+          ),
+          isReplay: true,
+        ));
+      }
+
+      // [I18]: reset AppInstall re-emit ETMEZ
+      expect(logger.events.whereType<AppInstall>(), isEmpty,
+          reason: 'tutorial reset — no AppInstall [I18]');
+
+      // [I20]: TutorialStarted isReplay=true
+      final tutorialEvents = logger.events.whereType<TutorialStarted>();
+      expect(tutorialEvents, hasLength(1));
+      expect(tutorialEvents.single.isReplay, true,
+          reason: 'reset flow — isReplay=true [I20]');
     });
   });
 }
