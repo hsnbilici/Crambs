@@ -1,0 +1,15 @@
+// ignore_for_file: type=lint
+// Template file — flutterfire configure ile üretilen gerçek
+// firebase_options.dart gitignored. Setup için: docs/firebase-setup.md
+
+import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
+
+class DefaultFirebaseOptions {
+  static FirebaseOptions get currentPlatform {
+    throw UnimplementedError(
+      'lib/firebase_options.dart missing. '
+      'Run `flutterfire configure` or decode CI secret. '
+      'See docs/firebase-setup.md for setup instructions.',
+    );
+  }
+}

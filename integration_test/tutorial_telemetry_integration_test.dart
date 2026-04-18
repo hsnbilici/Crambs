@@ -63,6 +63,17 @@ void main() {
         final id = e.payload['install_id']! as String;
         expect(id, isNot(InstallIdNotifier.kNotLoadedSentinel));
       }
+
+      // Invariant [I15]: SessionStart.installIdAgeMs >= 0
+      // (kAgeNotLoaded reddedilir)
+      for (final e in logger.events.whereType<SessionStart>()) {
+        expect(
+          e.installIdAgeMs,
+          isNot(InstallIdNotifier.kAgeNotLoaded),
+          reason: "-1 sentinel production emission'da görülmemeli",
+        );
+        expect(e.installIdAgeMs, greaterThanOrEqualTo(0));
+      }
     });
 
     testWidgets('second cold start → no TutorialStarted', (tester) async {
@@ -92,6 +103,15 @@ void main() {
       expect(logger.events.whereType<AppInstall>(), isEmpty);
       expect(logger.events.whereType<TutorialStarted>(), isEmpty);
       expect(logger.events.whereType<SessionStart>(), hasLength(1));
+
+      // Invariant [I15]: installIdAgeMs >= 0 in production
+      for (final e in logger.events.whereType<SessionStart>()) {
+        expect(
+          e.installIdAgeMs,
+          isNot(InstallIdNotifier.kAgeNotLoaded),
+        );
+        expect(e.installIdAgeMs, greaterThanOrEqualTo(0));
+      }
     });
 
     testWidgets('onPause emits SessionEnd with duration', (tester) async {

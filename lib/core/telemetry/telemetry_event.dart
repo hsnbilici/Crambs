@@ -24,10 +24,15 @@ class AppInstall extends TelemetryEvent {
 }
 
 class SessionStart extends TelemetryEvent {
-  const SessionStart({required this.installId, required this.sessionId});
+  const SessionStart({
+    required this.installId,
+    required this.sessionId,
+    required this.installIdAgeMs,
+  });
 
   final String installId;
   final String sessionId;
+  final int installIdAgeMs;
 
   @override
   String get eventName => 'session_start';
@@ -36,6 +41,7 @@ class SessionStart extends TelemetryEvent {
   Map<String, Object?> get payload => {
         'install_id': installId,
         'session_id': sessionId,
+        'install_id_age_ms': installIdAgeMs,
       };
 }
 

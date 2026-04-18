@@ -78,6 +78,9 @@ class SessionController {
       ..log(SessionStart(
         installId: installId,
         sessionId: _currentSessionId!,
+        // AppBootstrap step b'de ensureLoaded garanti; kAgeNotLoaded (-1)
+        // bypass bug sinyali — integration test [I15] bu sentinel'ı reddeder.
+        installIdAgeMs: _ref.read(installIdProvider.notifier).installIdAgeMs,
       ));
   }
 }

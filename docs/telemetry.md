@@ -297,6 +297,7 @@ Fired on every cold launch AND every `onResume` lifecycle event.
 |---|---|---|
 | install_id | String | Non-null — `<not-loaded>` sentinel if provider unresolved (invariant I1 — integration test fails on this value in production) |
 | session_id | String | UUID v4, unique per session |
+| install_id_age_ms | int | Milliseconds since `install_created_at` (SharedPreferences-backed, device-local). Fresh install: ~0. Cohort analytics primary metric (day-1/day-7/day-30 retention). `-1` (kAgeNotLoaded) sentinel = bootstrap race; invariant [I15] reddeder |
 
 ### session_end
 Fired on `onPause` / `onDetach`, AFTER `persistNow` completes (ordering invariant I6).
@@ -326,3 +327,4 @@ Fired when user completes Step 3 (`InfoCardOverlay` "Anladım" CTA) OR taps Skip
 ### Invariants
 - **[I1]** `install_id` never null in payload; sentinel `<not-loaded>` reserved for unresolved provider state (integration test rejects this value in production emission)
 - **[I6]** `onPause` ordering: `persistNow` ÖNCE, `SessionEnd` SONRA (process-kill during pause guarantees disk save; telemetry loss acceptable)
+- **[I15]** `SessionStart.install_id_age_ms >= 0` production path'te; `kAgeNotLoaded` (-1) sentinel yalnız bootstrap race state'inde görülebilir — integration test bu sentinel'ı reddeder

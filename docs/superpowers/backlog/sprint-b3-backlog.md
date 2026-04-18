@@ -8,13 +8,15 @@
 
 ## 1. B2 Spec'ten planlanmış B3 işleri (spec §13)
 
-- [ ] **Firebase Analytics provider wiring** — `TelemetryLogger` interface korunur; `FirebaseAnalyticsLogger implements TelemetryLogger` yazılır ve `telemetryLoggerProvider` override edilir (tek dosya swap). Ön-koşul: `flutterfire configure` runbook
-- [ ] **Crashlytics integration** — `FlutterError.onError` + `PlatformDispatcher.instance.onError` → `FirebaseCrashlytics.recordFlutterError` / `recordError`
-- [ ] **`install_id_age_ms` payload property** — install creation timestamp SharedPreferences'a yazılır (`crumbs.install_created_at`); `AppInstall.installIdAgeMs` = now - createdAt
-- [ ] **Settings → "Tutorial'i tekrar oyna" toggle** — `TutorialNotifier.reset()` eklenir (tutorialCompleted=false + currentStep=null + prefs clear); Settings ekranında switch
-- [ ] **Purchase / Upgrade / ResearchComplete event'leri** — telemetry event kataloğu genişlemesi (payload: id, cost, timestamp)
-- [ ] **GameState hydration side-effect telemetry** — offline_progress + save_recovery event'leri. B2'de `gameStateNotifierProvider.build()` telemetry emit ETMEZ; B3'te provider listen pattern eklenir (SessionStart → hydration events ordering deterministik)
-- [ ] **Step 2 granularity split** — `openShop` → `openShop` + `buyFirstBuilding` ayrımı (tutorial funnel drop-off analytics için gerekirse)
+> **Sprint B3 (2026-04-18) completion:** §1 item'lar 1, 2, 3 (Firebase Analytics wiring, Crashlytics integration, install_id_age_ms payload) landed. Spec: `docs/superpowers/specs/2026-04-18-sprint-b3-telemetry-activation-design.md`, plan: `docs/superpowers/plans/2026-04-18-sprint-b3-telemetry-activation.md`. §1/4-7 + §2+ B4 backlog.
+
+- ✅ **Firebase Analytics provider wiring** — Sprint B3 T3/T4/T8 (FirebaseBootstrap + FirebaseAnalyticsLogger + 3-state gate)
+- ✅ **Crashlytics integration** — Sprint B3 T3 (phase 3 FlutterError.onError + PlatformDispatcher.onError) + T10 (setUserIdentifier user identity)
+- ✅ **`install_id_age_ms` payload property** — Sprint B3 T5/T6/T7 (InstallIdNotifier._createdAt + SessionStart.installIdAgeMs + clock-backward clamp; AppInstall'dan drop edildi, SessionStart-only — cohort retention analytics primary)
+- [ ] **Settings → "Tutorial'i tekrar oyna" toggle** — `TutorialNotifier.reset()` eklenir (tutorialCompleted=false + currentStep=null + prefs clear); Settings ekranında switch (B4)
+- [ ] **Purchase / Upgrade / ResearchComplete event'leri** — telemetry event kataloğu genişlemesi (payload: id, cost, timestamp) (B4)
+- [ ] **GameState hydration side-effect telemetry** — offline_progress + save_recovery event'leri. B2'de `gameStateNotifierProvider.build()` telemetry emit ETMEZ; B4'te provider listen pattern eklenir (SessionStart → hydration events ordering deterministik)
+- [ ] **Step 2 granularity split** — `openShop` → `openShop` + `buyFirstBuilding` ayrımı (tutorial funnel drop-off analytics için gerekirse) (B4)
 
 ## 2. Sprint B2 per-task review bulguları
 
