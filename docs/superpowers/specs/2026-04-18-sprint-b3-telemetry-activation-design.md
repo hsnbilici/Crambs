@@ -211,37 +211,56 @@ class FirebaseBootstrap {
   static bool get isInitialized => _initialized;
 
   /// main()'de ÖNCE çağrılır — AppBootstrap.initialize ÖNCESİ.
-  /// Try/catch silent fallback: Firebase offline/bozuk config → app yine boot.
   /// Crashlytics error handlers AppBootstrap hatalarını yakalar (set sırası doğru).
+  ///
+  /// 3-faz strateji: phase 1 (initializeApp) **fatal** — fail'de early return,
+  /// `_initialized=false`. Phase 2 (collection flags) **best-effort** — fail
+  /// loglanır ama init çökertmez (Firebase native kayıtlı kalır, sonraki
+  /// launch'ta `duplicate app` hatası önlenir). Phase 3 (handler register) sync,
+  /// throw etmez.
   static Future<void> initialize() async {
+    // Phase 1 — fatal init (native Firebase app binding)
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      // Data transmission gate — debug'da native init'e dokunmaz,
-      // event/crash upload yapılmaz (dashboard temiz kalır)
+    } catch (e, st) {
+      debugPrint(
+        '[FirebaseBootstrap] initializeApp failed, telemetry disabled: $e\n$st',
+      );
+      return; // _initialized false kalır
+    }
+
+    // Phase 2 — best-effort data transmission gate (native init tamamlandı;
+    // flag set'i başarısız olsa bile Firebase.instance canlı kalır)
+    try {
       await FirebaseAnalytics.instance
           .setAnalyticsCollectionEnabled(!kDebugMode);
       await FirebaseCrashlytics.instance
           .setCrashlyticsCollectionEnabled(!kDebugMode);
-      // Error handlers — her build'de register, release-only transmission
-      FlutterError.onError =
-          FirebaseCrashlytics.instance.recordFlutterError;
-      PlatformDispatcher.instance.onError = (error, stack) {
-        FirebaseCrashlytics.instance
-            .recordError(error, stack, fatal: true);
-        return true;
-      };
-      _initialized = true;
     } catch (e, st) {
       debugPrint(
-        '[FirebaseBootstrap] init failed, telemetry disabled: $e\n$st',
+        '[FirebaseBootstrap] collection flag set failed (non-fatal): $e\n$st',
       );
-      // _initialized false kalır — telemetry/crashlytics no-op fallback
+      // Devam — Firebase platform default'larıyla çalışır.
     }
+
+    // Phase 3 — sync handler register (exception atmaz)
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+    _initialized = true;
   }
 }
 ```
+
+**Phase 1 fail semantics:** `initializeApp` fail'de early return → `isInitialized=false` → logger gate `DebugLogger`'a düşer, error handler'lar register edilmez (default Flutter handler çalışır). Uygulama Firebase'siz normal boot eder.
+
+**Phase 2 fail semantics:** Platform'a özel collection flag set hatası (nadir — corrupted Firebase state veya platform plugin bug). Firebase default'larıyla çalışır; `kDebugMode=true` debug build'de bile Analytics collection Firebase default'u aktif olabilir → dashboard kirlenmesi minor risk. Mitigation yeterli: phase 2 fail log'da görünür, developer müdahale edebilir.
+
+**Phase 3 fail:** Yok — handler atama sync field assignment.
 
 ### 3.2 main() sequence
 
@@ -546,6 +565,10 @@ if (FirebaseBootstrap.isInitialized) {
 
 Debug build'de `setCrashlyticsCollectionEnabled(false)` → collection disabled,
 bu test release-only çalışır.
+
+**Not:** Physical device önerilir. iOS simülatör / Android emulator Crashlytics
+upload yapabilir ama Firebase docs platform-specific uyarıları var; doğrulama
+garanti değil. Emülator'de görünmezse fiziksel cihazda yeniden dene.
 ```
 
 ---
@@ -598,6 +621,7 @@ class DefaultFirebaseOptions {
     IOS_GSI_PLIST_B64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST_B64 }}
     ANDROID_GSJ_JSON_B64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}
   run: |
+    set +x  # trace disable — base64 env secret'ın workflow log'una sızmasını engelle
     echo "$FIREBASE_OPTIONS_DART_B64" | base64 -d > lib/firebase_options.dart
     echo "$IOS_GSI_PLIST_B64" | base64 -d > ios/Runner/GoogleService-Info.plist
     echo "$ANDROID_GSJ_JSON_B64" | base64 -d > android/app/google-services.json
@@ -866,7 +890,12 @@ T5 (InstallIdNotifier ext.) ──► T6 (SessionStart shape) ──► T7 (Sess
 - **T1 + T2 paralel** (pubspec dependency vs gitignore/template bağımsız)
 - **T3 → T8 → T9**: Provider routing FirebaseAnalyticsLogger constructor'a referans alır (T4 sonrası). T4 önce yazılmazsa T8 compile fail
 - **T4 T3'e paralel-uygun** ama her ikisi de T1'e bağlı
-- **T5/T6/T7 sıralı**: Notifier extension → event shape → controller wiring
+- **T5 → T6 → T7 → T14 zinciri kritik:**
+  1. T5 — InstallIdNotifier `installIdAgeMs` getter + -1 sentinel
+  2. T6 — `SessionStart.installIdAgeMs` required field (B2 test'lerini kırar — T6 içinde mevcut `session_controller_test.dart` update + event şekli test update)
+  3. T7 — SessionController `_startNewSession` installIdAgeMs wiring (T6 shape olmadan compile fail) + regression test update
+  4. T14 — Integration test `tutorial_telemetry_integration_test.dart` installIdAgeMs invariant [I15] assertion (T6+T7 olmadan emission yok)
+  - T6 atomically tamamlanmalı: shape change + test update aynı commit'te yoksa suite kırılı kalır
 - **T14 (integration test) SON**: T9 + T10 wiring olmazsa full flow test edilemez
 - **T11/T12/T13/T15 paralel-OK**: docs + backlog cleanup
 
@@ -927,6 +956,7 @@ B2 backlog'dan carry-over + B3 sırasında not düşülenler:
 - [ ] Legal privacy policy draft
 - [ ] Spec/plan docs drift cleanup (B2 backlog §2 T3)
 - [ ] I12 negative contract test (TutorialScaffold non-router mount → throw)
+- [ ] **AppInstall trigger source canonical form:** B2/B3 `isFirstLaunch = !tutorialState.firstLaunchMarked` pattern'i tutorialState'i "first device boot" sinyali olarak re-purpose ediyor — semantic drift. Ayrı `firstBootProvider` (SharedPreferences-backed, tutorial state'inden disjoint) veya `installIdAgeMs < 5000` derivation. Hangisi canonical olsun? B4'te karar
 
 ---
 
