@@ -190,6 +190,33 @@ Mevcut bir paket ikon kütüphanesi yeterlidir. Önerilen: `phosphor_flutter` (6
 
 Binalar, event kartları ve achievement görsel ödülleri kesinlikle custom illustrated olmalıdır. Paket ikonları bu alanda yetersiz kalır; dönem diliyle, dokuyla ve fırın temasıyla konuşan özgün görseller gereklidir. Bu, MVP'nin görsel bütçesindeki en kritik üretim kalemidir.
 
+### Hero Tap Object — Oven Evolution (MVP Critical)
+
+Ana oyun ekranının merkezinde duran tap hedefi **fırının kendisidir** — ürün (pastry/cupcake/cookie) değil. Gerekçe: brand vaadi "fırın imparatorluğu" (PRD §1, §13 karar 1); merkez obje vaadin kendisini anlatır. Cookie Clicker kategori sözleşmesi ("ürün büyüt") yerine "kaynak kutla" kategorisine geçer — rekabet ayrışması bu tek asset'e bağlıdır.
+
+**Tap feedback kontratı:**
+- Tek tap → kapak aralanır, iç **kor ışığı flash** (micro motion, §9), kapak kapanırken kısa "cring" mikro-animasyon, ekrana "+X crumbs" floater yükselir, 2 "kor partikülü" radyal fırlar.
+- Her 10-15 tap → fırından bitmiş bir ürün slot'a düşer (bonus tadında; sabit sayı değil, playtest ayarlı).
+
+**Üç dönem evrim yolu:**
+
+| Dönem | Form | Kor/Işık | Kapak Mekaniği |
+|---|---|---|---|
+| Artisan | Taş ocak, alev dili, is izi | Turuncu alev, yanmış tereyağı tonu | Ahşap kollu kapak |
+| Endüstriyel | Çelik fırın bankası (3-4'lü grid), dijital sıcaklık | Kontrollü mavi alev, buhar | Hidrolik kapak / slider |
+| Galaktik | Portal gövdeli fırın; alev yerine nebula girdabı | Neon magenta / viyola swirl | Kapak yok — portal aralanır |
+
+**Asset bütçesi (MVP hedef):** 9-12 hero asset state. Her dönem için: idle (kapak kapalı, yumuşak breath döngüsü) + tap-open (kapak aralı, parlama peak) + tap-close (toparlanma) = 3 state × 3 dönem = 9 temel. İlave partikül preset'leri (crumb × dönem) ekler. Motion designer değil, illustrator + `flutter_animate` + basit sprite/implicit animation yeterlidir.
+
+**Siluet okunabilirliği:** Her dönem formu 64px'te birbirinden ayrıştırılmalıdır:
+- Artisan: kare + kubbe silueti
+- Endüstriyel: yatay banka + dikdörtgen grid
+- Galaktik: dairesel portal + orbital halka
+
+**Erişilebilirlik:** Kor/glow animasyonu yalnız görsel tuzlamadır; oyun-kritik bilgi (üretim miktarı, dönem durumu) taşımaz. Low-motion modda (`ux-flows.md §9.4`) glow statik snapshot'a düşer, tap feedback floater metni (+X crumbs) her zaman açık.
+
+**Code sözleşmesi:** Tutorial step enum (`lib/core/tutorial/tutorial_step.dart`) adı domain-neutral `tapHero` olmalıdır — hero obje brand iterasyonunda değişebilir ama enum değeri sabit kalır. Mevcut `tapCupcake` ismi brand kararından önce konmuş stub; ayrı atomic commit ile yeniden adlandırılır (scope: tek enum + referanslar).
+
 ### Siluet Okunabilirliği
 
 Tüm bina görselleri küçük boyutta (shop listesi, collection albümü) siluet düzeyinde tanınabilir olmalıdır. Bir bina, rengi kaldırıldığında dahi diğerinden ayırt edilmelidir. Bu kriter collection ekranındaki bina evrim görselleri için de geçerlidir (`ux-flows.md §5.7`).
@@ -353,3 +380,20 @@ Aşağıdaki kararlar bu brief kapsamında bilerek açık bırakılmıştır. Fi
 5. **Galaktik glow yoğunluğu:** Glow efektinin erişilebilirlik eşiklerini (kontrast) karşılarken dönem atmosferini yeterince iletmesini sağlayan referans bir UI örneği bulunabilir mi?
 6. **Onboarding görsel sesi:** Artisan döneminin el yapımı dokusu onboarding'de ne kadar yoğun? Çok fazla doku yeni oyuncuyu bunaltabilir; ne kadar "yalın" başlanmalı?
 7. **Custom illustration kapsamı:** MVP'de kaç bina görseli tam illüstrasyon olarak üretilecek? Kalan slotlar için hangi placeholder stratejisi kullanılacak?
+8. **Hero oven prestige evrim gömme:** Prestige dönüşümünde hero oven'ın yeni döneme geçişi nasıl dramatize edilir? Seçenekler: (a) **Inline morph** — prestige animasyonu sırasında mevcut fırın kendisi yeni forma evrilir (3-5 sn, ekran içinde); (b) **Dedicated cutscene** — fırın zoom-out, kısa sahneli geçiş, yeni form zoom-in (5-8 sn, Hero motion §9 üst sınırına yakın); (c) **Hybrid** — ilk prestige'de inline morph (hafif kutlama), ikinci prestige'de cutscene (galaktik dönem özel). MVP bütçesi ve playtest tatminini birlikte karşılayan seçim tasarımcı oturumunda kararlaştırılır.
+
+---
+
+## 14. Post-MVP Görsel Backlog
+
+MVP kapsamı dışında tutulan ama vizyonun parçası olarak kayıt altına alınan görsel işler. Sprint planlamalarında buradan öncelik çekilir.
+
+### Yön B — "Kneading Portal" Cutscene (Prestige Hero Moment)
+
+Art direction araştırması sırasında değerlendirilen Yön B ("kneading table" eylem-merkezli sahne) MVP için bütçe dışı bırakıldı; ancak **prestige geçişinin en dramatik anı** olan ikinci prestige (Endüstriyel → Galaktik) için saklanıyor.
+
+**Konsept:** Oven portal'ı açılır, içinden hamur-yoğurma jesti orbital animasyonla nebula'ya geçer. C yönünün fırın formu × B yönünün eylem sahnesi — en ender, en yüksek dramatik değer noktasında kombinasyonu. Oyuncu bu anı hayatında belki 3-5 kez görür; harcanan motion bütçesi frekans başına değer karşılığı yüksek.
+
+**Kapsam:** Tek lottie veya `flutter_animate` scene (≤3 sn, Hero motion §9 hard cap içinde). Yalnızca ikinci prestige'de tetiklenir. Low-motion modda statik montaj + metin anlatımına düşer.
+
+**Tetik:** Sprint C (R2 Research) sonrası veya Sprint D (prestige polish) adayı. MVP'de **kesinlikle kapsam dışı** — mevcut hero oven'ın §8 dönem evrimi yeterli.
