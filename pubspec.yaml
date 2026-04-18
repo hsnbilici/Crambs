@@ -36,6 +36,7 @@ dependencies:
   # Analytics / Monetization (ayrı runbook ile yapılandırılır)
   firebase_core: ^4.7.0
   firebase_analytics: ^12.3.0
+  firebase_crashlytics: ^5.0.0
   google_mobile_ads: ^8.0.0
   in_app_purchase: ^3.2.0
 
