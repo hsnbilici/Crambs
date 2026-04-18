@@ -48,3 +48,10 @@ coverage/
 # geçici; FVM + 3.27.0 kurulunca bu satır kaldırılacak ve pubspec.lock
 # commit edilecek)
 pubspec.lock
+
+# Firebase — committed: Dart template only; native configs via flutterfire
+# configure (dev) OR CI secret decode (PR/main). See docs/firebase-setup.md.
+lib/firebase_options.dart
+ios/Runner/GoogleService-Info.plist
+ios/firebase_app_id_file.json
+android/app/google-services.json
