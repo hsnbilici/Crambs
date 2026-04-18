@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:crumbs/features/tutorial/widgets/_message_callout.dart';
 import 'package:crumbs/features/tutorial/widgets/_pulse_halo.dart';
 import 'package:flutter/material.dart';
@@ -73,10 +75,13 @@ class _CoachMarkOverlayState extends State<CoachMarkOverlay> {
         constraints.maxWidth - media.padding.horizontal,
         constraints.maxHeight - media.padding.vertical,
       );
-      final clampedLeft =
-          topLeft.dx.clamp(safeRect.left, safeRect.right - size.width);
-      final clampedTop =
-          topLeft.dy.clamp(safeRect.top, safeRect.bottom - size.height);
+      // Target safe area'dan genişse (notched landscape + full-width row)
+      // safeRect.right - size.width < safeRect.left — num.clamp precondition
+      // ihlali. math.max ile upper >= lower garantisi.
+      final maxLeft = math.max(safeRect.left, safeRect.right - size.width);
+      final maxTop = math.max(safeRect.top, safeRect.bottom - size.height);
+      final clampedLeft = topLeft.dx.clamp(safeRect.left, maxLeft);
+      final clampedTop = topLeft.dy.clamp(safeRect.top, maxTop);
       final clamped =
           Rect.fromLTWH(clampedLeft, clampedTop, size.width, size.height);
       final halo = clamped.inflate(12);

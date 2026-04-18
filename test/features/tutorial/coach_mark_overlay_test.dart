@@ -126,5 +126,36 @@ void main() {
       await tester.pump();
       expect(find.byType(CoachMarkOverlay), findsOneWidget);
     });
+
+    testWidgets('does not crash when target wider than safe area (bug_002)',
+        (tester) async {
+      final key = GlobalKey();
+      // Simulate notched landscape: non-zero horizontal padding +
+      // target wider than safe area width.
+      await tester.pumpWidget(MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            padding: EdgeInsets.symmetric(horizontal: 44),
+            size: Size(400, 200),
+          ),
+          child: Scaffold(
+            body: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 50,
+                  child: SizedBox(key: key, width: 400, height: 80),
+                ),
+                CoachMarkOverlay(targetKey: key, message: 'oversized target'),
+              ],
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+      expect(tester.takeException(), isNull,
+          reason: 'clamp precondition violation should not crash');
+      expect(find.byType(CoachMarkOverlay), findsOneWidget);
+    });
   });
 }
