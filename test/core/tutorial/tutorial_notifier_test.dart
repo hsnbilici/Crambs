@@ -179,4 +179,66 @@ void main() {
       expect(prefs.getBool('crumbs.tutorial_completed'), true);
     });
   });
+
+  group('TutorialNotifier.reset() + consumeReplayFlag (B4 [I20])', () {
+    test('reset() → both prefs removed', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'crumbs.first_launch_marked': true,
+        'crumbs.tutorial_completed': true,
+      });
+      final c = buildContainer();
+      await c.read(tutorialNotifierProvider.future);
+      await c.read(tutorialNotifierProvider.notifier).reset();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('crumbs.first_launch_marked'), isNull);
+      expect(prefs.getBool('crumbs.tutorial_completed'), isNull);
+    });
+
+    test('reset() → state fresh AsyncData defaults', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'crumbs.first_launch_marked': true,
+        'crumbs.tutorial_completed': true,
+      });
+      final c = buildContainer();
+      await c.read(tutorialNotifierProvider.future);
+      await c.read(tutorialNotifierProvider.notifier).reset();
+
+      final state = c.read(tutorialNotifierProvider).requireValue;
+      expect(state.firstLaunchMarked, false);
+      expect(state.tutorialCompleted, false);
+      expect(state.currentStep, null);
+    });
+
+    test('reset then consumeReplayFlag returns true', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final c = buildContainer();
+      await c.read(tutorialNotifierProvider.future);
+
+      final beforeReset =
+          c.read(tutorialNotifierProvider.notifier).consumeReplayFlag();
+      expect(beforeReset, false);
+
+      await c.read(tutorialNotifierProvider.notifier).reset();
+      final afterReset =
+          c.read(tutorialNotifierProvider.notifier).consumeReplayFlag();
+      expect(afterReset, true);
+    });
+
+    test('consumeReplayFlag single-use (second call returns false) [I20]',
+        () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final c = buildContainer();
+      await c.read(tutorialNotifierProvider.future);
+      await c.read(tutorialNotifierProvider.notifier).reset();
+
+      final notifier = c.read(tutorialNotifierProvider.notifier);
+      final first = notifier.consumeReplayFlag();
+      final second = notifier.consumeReplayFlag();
+
+      expect(first, true);
+      expect(second, false,
+          reason: 'Single-use: second call returns false [I20]');
+    });
+  });
 }
