@@ -78,6 +78,8 @@
 
 ## 5. Ultrareview bulguları (2026-04-18)
 
+> **Not:** 5 bug da B2 PR öncesi FIX edildi (commit'ler: `757804c` bug_002, `bf6544a` bug_003, `cfa6c3b` bug_017, `7e8c372` bug_011, `dd1e0c5` bug_009). Bu bölüm historical reference olarak kalır; B3 scope dışı.
+
 ### 🔴 bug_009 — `kTutorialShopNavKey` duplicate GlobalKey → navigation crash (normal, PR-blocker)
 
 **Dosya:** `lib/app/nav/app_navigation_bar.dart:86-88`
@@ -172,13 +174,9 @@ Ya da target safe area'dan genişse `SizedBox.shrink()` fallback. Regression tes
 
 ## Önceliklendirme rehberi (B3 brainstorming için)
 
-**🔴 PR-blocker / hotfix kararı:**
-- **bug_009** duplicate GlobalKey nav crash (§5) — PR merge öncesi düzeltilmesi önerilir. `StatefulShellRoute.indexedStack` refactor ile hem tutorial keys hem genel nav mimarisi düzelir
-- **bug_011** Session Recap §6 restore (§5) — PR öncesi quick docs fix
+**✅ Ultrareview bulguları B2 PR öncesi hepsi fix edildi** (§5 bkz).
 
 **Kritik (B3 içinde):**
-- **bug_003** onResume SessionEnd emission fix (§5 — per-task T4 review de flag'lemişti, şimdi ultrareview konfirme ediyor)
-- **bug_002** CoachMarkOverlay math.max clamp guard (§5)
 - Firebase Analytics wiring (§1)
 - Spec/plan docs drift (§2 T3 — eski imza)
 - I12 negative contract test (§2 T14)
