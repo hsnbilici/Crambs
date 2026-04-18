@@ -72,9 +72,23 @@ flutter analyze
 # Production build
 flutter build ios --release
 flutter build apk --release
+
+# Firebase setup — flutterfire_cli ile lib/firebase_options.dart üretilir
+# Detay runbook: docs/firebase-setup.md. CI'da base64 secret'tan decode edilir.
+dart pub global activate flutterfire_cli
+flutterfire configure --project=crumbs-prod
+
+# iOS simülatör deploy (debug build + install + launch)
+flutter build ios --debug --simulator --no-codesign
+xcrun simctl install booted build/ios/iphonesimulator/Runner.app
+xcrun simctl launch booted com.crumbs.game
+# Telemetry log stream:
+xcrun simctl spawn booted log stream --predicate 'process == "Runner"' --level debug
 ```
 
 > **CI:** GitHub Actions — şablonlar `.github/workflows/{ci,nightly,release}.yml`; spec `docs/ci-plan.md`. `docs/test-plan.md §10.1` coverage gate ile senkron.
+
+> **Paralel test flake:** `flutter test` varsayılan paralel (N=CPU) çalışır; `app_lifecycle_gate_test` gibi `WidgetsBinding` global state'ine dokunan testler ara sıra flake verir. CI `-j 1` ile çalışır (bkz. `.github/workflows/ci.yml`). Local tekrar üretirse `flutter test -j 1` kullan.
 
 ## 4. Repo sözleşmesi
 
@@ -94,6 +108,7 @@ flutter build apk --release
 - `docs/scaffold-plan.md` ✓ — Flutter scaffold blueprint (pubspec, lib/ iskelet, stub içerikleri)
 - `docs/ci-plan.md` ✓ — GitHub Actions workflow şablonları
 - `docs/visual-design.md` ✓ — görsel kimlik brief'i (hex YOK, tasarımcı kesinleştirir)
+- `docs/firebase-setup.md` ✓ — Firebase onboarding runbook (flutterfire configure, CI secret mgmt macOS+Linux, Crashlytics manual verification, privacy note) [B3 T12]
 
 **Sprint dokümanları** (brainstorming + writing-plans workflow):
 - `docs/superpowers/specs/` — brainstorming çıktısı design doc'ları (YYYY-MM-DD-<feature>-design.md)
@@ -115,6 +130,9 @@ lib/
     state/          # GameStateNotifier + derived providers (cross-feature)
     preferences/    # SharedPreferences-backed Notifier'lar (onboarding vb.)
     feedback/       # UI sinyal modelleri (OfflineReport, SaveRecoveryReason)
+    telemetry/      # TelemetryLogger + InstallIdNotifier + SessionController + FirebaseAnalyticsLogger (B2/B3)
+    tutorial/       # TutorialNotifier (AsyncNotifier) + step enum + state (B2)
+    launch/         # FirstBootNotifier — AppInstall trigger source, tutorial disjoint (B4)
   features/
     home/
     shop/
@@ -122,6 +140,8 @@ lib/
     research/
     prestige/
     achievements/
+    tutorial/       # TutorialScaffold + overlay widgets (B2 FR-3)
+    settings/       # SettingsPage + Developer subsection + providers (B4)
   ui/
     components/
     theme/
@@ -257,6 +277,20 @@ Tüm sorular 2026-04-16 tarihinde karara bağlandı. Sayısal değerler playtest
 7. **Aktif research iptali:** İptal edilen araştırmanın R2 maliyeti **iade edilmez**. Gerekçe: tek slot kuyruk sistemi zaten bir ekonomik frictionken iade bunu sulandırır; iptal dikkatli planlama teşvik eder.
 
 Yeni açık soru çıkarsa bu bölümü PRD'deki karşılığıyla birlikte güncelle.
+
+### Sprint süreci kararları (post-PRD)
+Brainstorming + implementation döngüsünde alınan kalıcı teknik kararlar:
+
+**B3 — Firebase Analytics + Crashlytics wiring:**
+- `FirebaseBootstrap.initialize` main()'de; dev build `firebase_options.dart` yoksa `kDebugMode` gate'iyle stub'a düşer. Release build'de dosya zorunlu — `DefaultFirebaseOptions.currentPlatform` compile-error verir ve bu kasıtlıdır (no-telemetry release kazara ship edilmesin).
+- CI secret yönetimi macOS+Linux uyumlu: `base64 -D` (macOS) / `base64 -d` (linux) runbook'ta ikisi de listelenir. `docs/firebase-setup.md §3` tek kaynak.
+- `firebase_analytics.setAnalyticsCollectionEnabled(kReleaseMode)` — debug build telemetri Firebase console'a yazmaz (DebugLogger yerel kanal).
+
+**B4 — FirstBootNotifier + telemetry catalog expansion:**
+- AppInstall trigger source `FirstBootNotifier` → `tutorialState.firstLaunchMarked`'dan **disjoint**. Tutorial replay (reset) AppInstall re-emit etmez (invariant [I18]).
+- `TutorialStarted.isReplay` payload bool, `consumeReplayFlag()` single-use reader ile set edilir (invariant [I20]).
+- Developer settings subsection `developerVisibilityProvider` flag-gated; production'da gizli (flag default false; B4'te geliştirme için true).
+- Event catalog B4'te genişledi: `purchase_made` (building_id/cost/owned_after), `upgrade_purchased` (upgrade_id/cost). Firebase reserved prefix invariant test her yeni event'te enforce edilir.
 
 ## 14. Referans
 - Ürün kararları, ekonomi ilkeleri, unlock ağacı, sprint planı → `cookie_clicker_derivative_prd.md`

@@ -112,3 +112,33 @@ Geçmiş planlar (tümü tamamlandı, git history'de):
 **Kök neden:** TDD strict + atomic commit discipline — shape change commit'i tek başına kırık bırakır, downstream fix commit'leri takip eder.
 
 **Önleme kuralı:** Plan task açıklamasında "compile-green restore T<n>'e kadar" açıkça yaz. Subagent brief'ine "Analyze expected FAIL after this commit — T<next> resolves" explicit note. B4 T3 bu pattern'i dokümante etti.
+
+---
+
+## Sprint B4 simulator deploy dersleri (2026-04-18)
+
+### Ders: iOS deployment target — Firebase dependency'lerle senkron
+**Problem:** `flutter build ios` fail: "firebase_crashlytics requires higher minimum iOS deployment version (15.0). Current: 13.0". B3'te pubspec'e `firebase_crashlytics: ^5.0.0` eklendi ama iOS side deployment target güncellenmedi — ilk iOS build B4'te yapıldığı için geç fark edildi.
+
+**Kök neden:** Flutter pubspec dependency değişikliği native side requirement'larını otomatik bump etmez. `ios/Podfile` platform directive + `ios/Runner.xcodeproj/project.pbxproj` IPHONEOS_DEPLOYMENT_TARGET ayrı yerlerden yönetilir. CocoaPods post-install hook `flutter_additional_ios_build_settings` tam çözmedi.
+
+**Önleme kuralı:** Firebase veya benzeri native-integrated package eklerken her zaman:
+1. Package'ın minimum iOS version'ını kontrol et (pub.dev / docs)
+2. `ios/Podfile` `platform :ios, 'X.X'` uncomment + güncelle
+3. `ios/Runner.xcodeproj/project.pbxproj` IPHONEOS_DEPLOYMENT_TARGET'ı tüm 3 config'te (Debug/Profile/Release) güncelle
+4. `flutter build ios --debug --simulator --no-codesign` ile early validation yap
+
+Benzer pattern Android için: `android/app/build.gradle.kts` `minSdk` — firebase_crashlytics Android min SDK 21+.
+
+### Ders: google_mobile_ads → GADApplicationIdentifier zorunluluğu
+**Problem:** Simulator'de app launch sonrası hard crash: `GADInvalidInitializationException: The Google Mobile Ads SDK was initialized without an application ID`. Dart-level try/catch yutamaz (native Objective-C exception, boot time'da `dispatch_async` block'ta fire).
+
+**Kök neden:** `google_mobile_ads: ^8.0.0` pubspec'te B1'den beri vardı (scaffold, post-MVP FR-14 için hazırlık). iOS SDK `applicationDidFinishLaunching` sırasında `GADApplicationVerifyPublisherInitializedCorrectly` çağırıyor — Info.plist'te `GADApplicationIdentifier` yoksa NSException throw. B1-B3'te iOS build hiç yapılmadı (Flutter test environment Mock-based), crash ancak B4 simulator deploy'unda ortaya çıktı.
+
+**Önleme kuralı:**
+1. Native-boot-time crash'i olan package'lar için pubspec ekleme sırasında aynı anda Info.plist / AndroidManifest.xml setup'ı yap
+2. Dev environment için Google resmi test ID kullan: `ca-app-pub-3940256099942544~1458002511` (iOS), `ca-app-pub-3940256099942544~3347511713` (Android)
+3. Production'da real AdMob account ID FR-14 rewarded ad implementation sprint'inde swap edilir (post-MVP)
+4. Native SDK boot validation exception'ları Dart catch edemez — Info.plist requirement'ı zorunlu-at-commit-time
+
+**Meta-ders:** "Pubspec'e dep ekle → hiç kullanma → saklı boot crash" pattern'i tehlikeli. Dependency eklerken o dep'in boot-time requirement'larını immediate execute et (Info.plist entry, native SDK init), değilse dep'i ekleme. B1 scaffold decision'ı retroactively temizlenmeli: ya google_mobile_ads/in_app_purchase Info.plist + AndroidManifest entry'leri tam setup, ya B6+'ya kadar pubspec'ten kaldır.
