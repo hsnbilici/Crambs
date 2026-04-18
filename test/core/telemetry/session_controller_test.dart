@@ -119,9 +119,38 @@ void main() {
 
       controller.onResume();
       final secondSessionId =
-          (logger.events.last as SessionStart).sessionId;
+          logger.events.whereType<SessionStart>().last.sessionId;
 
       expect(secondSessionId, isNot(firstSessionId));
+      expect(logger.beginCount, 2);
+    });
+
+    test('closes prior unclosed session on double-resume (bug_003)',
+        () async {
+      final logger = _FakeLogger();
+      final c = buildContainer(logger);
+      await c.read(installIdProvider.notifier).ensureLoaded();
+      final controller = c.read(sessionControllerProvider);
+      // Cascade not possible: await separates onLaunch and onResume.
+      // ignore: cascade_invocations
+      controller.onLaunch(isFirstLaunch: false);
+      final firstSessionId =
+          (logger.events.single as SessionStart).sessionId;
+
+      await Future<void>.delayed(const Duration(milliseconds: 15));
+      controller.onResume();
+
+      // Assertion: prior session was closed with SessionEnd matching
+      // firstSessionId (iOS Control Center peek semantics).
+      final endEvent = logger.events.whereType<SessionEnd>().single;
+      expect(endEvent.sessionId, firstSessionId);
+      expect(endEvent.durationMs, greaterThanOrEqualTo(10));
+      expect(logger.endCount, 1,
+          reason: 'endSession() fired for closed prior session');
+
+      // And new SessionStart still emitted with fresh id.
+      final newStart = logger.events.whereType<SessionStart>().last;
+      expect(newStart.sessionId, isNot(firstSessionId));
       expect(logger.beginCount, 2);
     });
   });

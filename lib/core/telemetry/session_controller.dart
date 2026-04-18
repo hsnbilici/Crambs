@@ -40,16 +40,24 @@ class SessionController {
     _startNewSession(installId);
   }
 
+  /// iOS Control Center/notification peek gibi `resumed → inactive → resumed`
+  /// döngülerinde onPause hiç tetiklenmez — aktif session varsa önce kapatılır
+  /// (defansif kontrat, spec §6.4 invariant 4).
   void onResume() {
     final installId =
         resolveInstallIdForTelemetry(_ref.read(installIdProvider));
+    _closeActiveSession(installId);
     _startNewSession(installId);
   }
 
   void onPause() {
-    if (_currentSessionId == null) return;
     final installId =
         resolveInstallIdForTelemetry(_ref.read(installIdProvider));
+    _closeActiveSession(installId);
+  }
+
+  void _closeActiveSession(String installId) {
+    if (_currentSessionId == null) return;
     final duration = DateTime.now().difference(_sessionStartedAt!);
     _logger
       ..log(SessionEnd(
