@@ -1,4 +1,5 @@
 import 'package:crumbs/core/telemetry/install_id_notifier.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,6 +85,98 @@ void main() {
       expect(resolveInstallIdForTelemetry(c.read(installIdProvider)),
           InstallIdNotifier.kNotLoadedSentinel);
       expect(InstallIdNotifier.kNotLoadedSentinel, '<not-loaded>');
+    });
+  });
+
+  group('InstallIdNotifier — installIdAgeMs (B3)', () {
+    test('pre-ensureLoaded → kAgeNotLoaded (-1)', () {
+      final c = buildContainer();
+      final age = c.read(installIdProvider.notifier).installIdAgeMs;
+      expect(age, InstallIdNotifier.kAgeNotLoaded);
+      expect(InstallIdNotifier.kAgeNotLoaded, -1);
+    });
+
+    test('fresh disk → _createdAt=now + pref yazıldı + age in [0, 5s]',
+        () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final c = buildContainer();
+      await c.read(installIdProvider.notifier).ensureLoaded();
+
+      final notifier = c.read(installIdProvider.notifier);
+      final age = notifier.installIdAgeMs;
+      expect(age, greaterThanOrEqualTo(0));
+      expect(age, lessThan(5000),
+          reason: 'fresh _createdAt just wrote; age well under 5s');
+
+      final prefs = await SharedPreferences.getInstance();
+      final createdAtStr = prefs.getString('crumbs.install_created_at');
+      expect(createdAtStr, isNotNull);
+      expect(DateTime.tryParse(createdAtStr!), isNotNull);
+    });
+
+    test('existing valid pref → _createdAt parse → age > 0', () async {
+      final oneMinuteAgo =
+          DateTime.now().subtract(const Duration(minutes: 1));
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'crumbs.install_created_at': oneMinuteAgo.toIso8601String(),
+      });
+      final c = buildContainer();
+      await c.read(installIdProvider.notifier).ensureLoaded();
+
+      final age = c.read(installIdProvider.notifier).installIdAgeMs;
+      expect(age, greaterThanOrEqualTo(60000));
+      expect(age, lessThan(120000));
+    });
+
+    test('corrupted pref → debugPrint + reset to now', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'crumbs.install_created_at': 'not-a-valid-iso-8601',
+      });
+
+      final logs = <String>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (msg, {wrapWidth}) {
+        if (msg != null) logs.add(msg);
+      };
+
+      try {
+        final c = buildContainer();
+        await c.read(installIdProvider.notifier).ensureLoaded();
+
+        expect(
+          logs.any((l) =>
+              l.contains('install_created_at parse failed') &&
+              l.contains('not-a-valid-iso-8601')),
+          isTrue,
+          reason: 'corruption debugPrint forensic log bekleniyor',
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        final reset = prefs.getString('crumbs.install_created_at');
+        expect(reset, isNotNull);
+        expect(DateTime.tryParse(reset!), isNotNull);
+
+        final age = c.read(installIdProvider.notifier).installIdAgeMs;
+        expect(age, greaterThanOrEqualTo(0));
+        expect(age, lessThan(5000));
+      } finally {
+        debugPrint = originalDebugPrint;
+      }
+    });
+
+    test('clock-backward (_createdAt in future) → 0 clamp', () async {
+      final oneHourFuture =
+          DateTime.now().add(const Duration(hours: 1));
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'crumbs.install_created_at': oneHourFuture.toIso8601String(),
+      });
+      final c = buildContainer();
+      await c.read(installIdProvider.notifier).ensureLoaded();
+
+      final age = c.read(installIdProvider.notifier).installIdAgeMs;
+      expect(age, 0,
+          reason:
+              'negative diff (user clock moved backward) → clamp to 0');
     });
   });
 }
