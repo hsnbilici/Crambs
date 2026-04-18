@@ -12,7 +12,7 @@ class TutorialNotifier extends AsyncNotifier<TutorialState> {
   bool _replayTriggered = false;
 
   /// Bir sonraki `start()` emit'inde `isReplay` ne olacak — `reset()` sonrası
-  /// true döner, ilk okuyucu false'a sıfırlar (single-use). Invariant [I20].
+  /// true döner, ilk okuyucu false'a sıfırlar (single-use). Invariant I20.
   bool consumeReplayFlag() {
     final value = _replayTriggered;
     _replayTriggered = false;
@@ -21,7 +21,7 @@ class TutorialNotifier extends AsyncNotifier<TutorialState> {
 
   /// Tutorial state'i tamamen sıfırlar — Settings > Developer "Tutorial'i
   /// tekrar oyna" dan tetiklenir. Prefs clear + replay flag set + fresh
-  /// state. FirstBootNotifier'a dokunulmaz — AppInstall re-emit olmaz [I18].
+  /// state. FirstBootNotifier'a dokunulmaz — AppInstall re-emit olmaz I18.
   ///
   /// Concurrent call'lar SharedPreferences internal lock ile serialize —
   /// idempotent.

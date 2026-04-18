@@ -47,10 +47,14 @@ void main() {
       await c.read(tutorialNotifierProvider.notifier).start();
       if (c.read(tutorialNotifierProvider).value?.currentStep ==
           TutorialStep.tapCupcake) {
+        final isReplay = c
+            .read(tutorialNotifierProvider.notifier)
+            .consumeReplayFlag();
         logger.log(TutorialStarted(
           installId: resolveInstallIdForTelemetry(
             c.read(installIdProvider),
           ),
+          isReplay: isReplay,
         ));
       }
 

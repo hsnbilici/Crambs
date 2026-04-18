@@ -40,11 +40,16 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
       final postState = ref.read(tutorialNotifierProvider).value;
       if (postState?.currentStep == TutorialStep.tapCupcake) {
         _startedAt = DateTime.now();
+        // B4: isReplay single-use flag — reset() sonrası ilk emit true [I20]
+        final isReplay = ref
+            .read(tutorialNotifierProvider.notifier)
+            .consumeReplayFlag();
         ref.read(telemetryLoggerProvider).log(
               TutorialStarted(
                 installId: resolveInstallIdForTelemetry(
                   ref.read(installIdProvider),
                 ),
+                isReplay: isReplay,
               ),
             );
       }
