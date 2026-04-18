@@ -436,6 +436,8 @@ Future<bool> buyUpgrade(String id) async {
 
 **Emission invariant [I19]:** Yalnız **successful purchase path** — canAfford=false / alreadyOwned / unknown id path'lerinde emission YOK. Integration test [I19] bu'yu regression'a karşı korur.
 
+**Helper signature clarification:** `resolveInstallIdForTelemetry(String?)` — B3 T3-fix commit `ff83610`'dan itibaren `Ref` yerine `String?` alır (Riverpod 3.1 `Ref`/`WidgetRef`/`ProviderContainer` disjoint type problemi). Call site pattern: `resolveInstallIdForTelemetry(ref.read(installIdProvider))` — caller `.read()` yapar, helper null-sentinel coercion uygular.
+
 ### 4.6 TutorialNotifier.reset() + consumeReplayFlag
 
 ```dart
@@ -541,6 +543,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// `const bool.fromEnvironment` compile-time sabit — widget test'te doğrudan
 /// manipüle edilemez. Provider wrapper test ergonomisini sağlar.
+///
+/// **Production release gate (manual smoke zorunlu):** `kDebugMode` test
+/// ortamında her zaman true döner — automated test ile "release build'de
+/// Developer section gizli" invariant'ı doğrulanamaz. DoD §6.2 "Settings →
+/// Developer production build'de gizli" manual smoke test zorunlu (runbook).
 final developerVisibilityProvider = Provider<bool>((ref) {
   return kDebugMode || const bool.fromEnvironment('CRASHLYTICS_TEST');
 });
@@ -793,7 +800,12 @@ B3'ten [I1]-[I17] korunur + 3 yeni:
 2. **Pre-B4 migration** (install_id mevcut, first_launch_observed yok) — no AppInstall emit [I18], TutorialStarted behavior unchanged (tutorial state fresh or prior)
 3. **Post-reset replay flow** — reset → start → TutorialStarted(isReplay: true) emit
 
-**T13 explicit DoD:** 3 senaryo × AppInstall emission count assertion (0, 0, 0 respectively for re-test scenarios).
+**T13 explicit DoD:**
+- 3 senaryo × AppInstall emission count assertion:
+  - Fresh B4 install → 1 AppInstall event
+  - Pre-B4 migration → 0 AppInstall event ([I18])
+  - Post-reset replay → 0 AppInstall event (tutorial state disjoint)
+- **State isolation zorunlu:** Her senaryo başında `SharedPreferences.setMockInitialValues({...})` + yeni `ProviderContainer(overrides: [...])` kurulur. Previous senaryonun state'i leak etmemeli (setUp'ta reset ya da test group'ları ayrı).
 
 ### 7.4 Manual QA
 
@@ -821,9 +833,9 @@ Etiketler: **(S)** subagent-driven TDD strict, **(C)** controller-direct, **★*
 | T1 | `FirstBootNotifier` + tests (fresh + migration + idempotent + stable) | S | ★ |
 | T2 | `AppBootstrap` step b' — firstBootProvider.ensureObserved + isFirstLaunch rewire + test | S | ★ |
 | T3 | `TelemetryEvent` — PurchaseMade + UpgradePurchased + TutorialStarted.isReplay field + event test updates | S | ★ |
-| T4 | `FirebaseAnalyticsLogger` regex invariant events list 6'ya genişler + log() tests 2 yeni event + isReplay coercion (T3 ile aynı commit'te gidebilir — atomic concern separation) | C | |
+| T4 | `FirebaseAnalyticsLogger` regex invariant events list 6'ya genişler + log() tests 2 yeni event + isReplay coercion. **T3'ten ayrı commit**: T3 subagent brief'i event shape + event_test.dart ile sınırlı, regex invariant list T4'te güncellenir. Atlanabilir değil — T3 tek başına compile fail vermez ama regex invariant 4 event'te kalır (PurchaseMade/UpgradePurchased coverage eksik) | C | |
 | T5 | `GameStateNotifier` buyBuilding + buyUpgrade telemetry emission (_persistSafe sonrası sync; crash window %0.01 kabul — B5 analysis) + `game_state_notifier_telemetry_test.dart` | S | ★ |
-| T6 | `TutorialNotifier.reset()` + consumeReplayFlag single-use + idempotency test | S | |
+| T6 | `TutorialNotifier.reset()` + consumeReplayFlag single-use + idempotency test. **Non-★ gerekçe:** invariant [I20] unit-level test coverage ile yakalanır (consumeReplayFlag single-use assertion + reset → start sequence); TDD discipline yeterli. Kıyaslama: B3 InstallIdNotifier extension ★'dı çünkü sentinel propagation integration test'e yayıldı. B4 T6 scope dar, 3 unit test solid coverage | S | |
 | T7 | `TutorialScaffold` isReplay emission wiring (consumeReplayFlag read sonrası TutorialStarted constructor) + test | C | |
 | T8 | `lib/features/settings/providers.dart` developerVisibilityProvider | C | |
 | T9 | `AudioSettingsSection` stub widget + smoke test | C | |
@@ -870,7 +882,7 @@ T12 (l10n) ──► T10, T11 (compile dependency)
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Pre-B4 migration proxy `install_id` bazlı — edge case false-positive | AppInstall re-emit edilen pre-B4 user | Migration test 2 senaryo (fresh + backfill); manual B3→B4 upgrade doğrulama release notes |
+| Pre-B4 migration proxy `install_id` bazlı — edge case false-positive | AppInstall re-emit edilen pre-B4 user | Migration test 2 senaryo (fresh + backfill); manual B3→B4 upgrade doğrulama release notes. **QA edge checklist:** (a) B1-only user (B2/B3 atlayan) — `install_id` var, backfill çalışır; (b) Reinstall (uninstall+install) — tüm prefs silinir, fresh path (expected); (c) SharedPreferences corruption — fresh path false-positive (kabul, nadir) |
 | `FirebaseBootstrap.isInitialized` static — Crashlytics test button widget test coverage zayıf | Accidental shipped crash button | Test: isInitialized=false → snackbar; full path manual QA. B5 followup: provider wrapper |
 | Dev section production'a sızması | Real user'a hard crash erişimi | `kDebugMode` compile-time sabit — widget tree'de yok. Override test + release build manual verify |
 | Purchase telemetry emit-then-persist crash window | Dashboard ~0.01% double-count | Accepted risk; B5 analysis followup. Fire-and-forget B3 pattern tutarlı |
@@ -894,6 +906,8 @@ B4 PR merge sonrası kritik regresyon (örn. AppInstall flood, UI crash):
 7. TutorialNotifier.reset() method silinir — Settings Developer button çağırması compile fail → Developer section rewrite kaldırılır
 
 **Not:** Analytics data B4 window'unda toplanan dashboard'da kalır (Firebase silmez). `is_replay` field null'a düşer (eski AppInstall payload shape) — dashboard schema'da null-tolerant olduğu sürece sorun değil.
+
+**Revert + re-deploy idempotent:** B4 revert → existing user'larda `first_launch_observed=true` pref disk'te kalır. B5+ ile B4 tekrar deploy edilirse `ensureObserved` bu pref'i okur → false döner → AppInstall re-emit EDİLMEZ (continuity korunur, double-emit spike yok).
 
 ---
 
