@@ -9,7 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///   a. ensureInitialized + SharedPreferences warm
 ///   b. installIdProvider.ensureLoaded()
 ///   c. gameStateNotifierProvider.future (hydrate + migration)
-///   d. installIdProvider.adoptFromGameState(gs.meta.installId) [disk wins]
+///   d. installIdProvider.adoptFromGameState(gs.meta.installId)
+///      (GameState-wins: save dosyası authoritative, disk overwrite)
 ///   e. tutorialNotifierProvider.future (hydrate; flicker guard \[I11\])
 ///   f. sessionController.onLaunch(isFirstLaunch)
 class AppBootstrap {

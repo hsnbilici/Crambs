@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Install ID'nin tek kaynağı (SharedPreferences).
-/// Boot: ensureLoaded() → adoptFromGameState(gs.meta.installId) (disk wins).
+/// Boot: ensureLoaded() → adoptFromGameState(gs.meta.installId)
+/// (GameState-wins: GameState'teki değer authoritative, disk farklıysa
+/// overwrite edilir).
 /// Telemetry payload için:
 ///   `resolveInstallIdForTelemetry(ref.read(installIdProvider))`
 /// şeklinde çağır — null ise `<not-loaded>` sentinel döner (invariant I1).
@@ -21,8 +23,8 @@ class InstallIdNotifier extends Notifier<String?> {
   }
 
   /// Boot sırasında, GameState hydrate sonrası çağrılır.
-  /// Disk-wins: GameState.meta.installId her zaman authoritative;
-  /// disk farklıysa overwrite edilir.
+  /// GameState-wins: GameState.meta.installId her zaman authoritative;
+  /// disk farklıysa disk'teki değer overwrite edilir.
   Future<void> adoptFromGameState(String savedInstallId) async {
     final prefs = await SharedPreferences.getInstance();
     final existing = prefs.getString(_prefKey);
