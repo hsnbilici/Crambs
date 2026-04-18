@@ -48,5 +48,19 @@
   "tutorialStep3Title": "Neden Crumb kazanıyorsun?",
   "tutorialStep3Body": "Binaların otomatik olarak saniyede Crumb üretir. Daha fazla satın al, daha hızlı büyü!",
   "tutorialSkipButton": "Geç",
-  "tutorialCloseButton": "Anladım"
+  "tutorialCloseButton": "Anladım",
+  "settingsAudioSection": "Ses ve Müzik",
+  "settingsAudioMusicToggle": "Müzik",
+  "settingsAudioSfxToggle": "Efektler",
+  "settingsAudioStubHint": "Yakında aktif olacak",
+  "settingsDevSection": "Geliştirici",
+  "settingsDevTestCrash": "Test Crash Gönder",
+  "settingsDevTestCrashHint": "Crashlytics doğrulama — cihaz yeniden açıldığında rapor gönderilir",
+  "settingsDevTestCrashNotInit": "Firebase başlatılmadı — crash rapor edilmez",
+  "settingsDevTutorialReplay": "Tutorial'i Tekrar Oyna",
+  "settingsDevTutorialReplayHint": "3 adımlı girişi yeniden başlatır",
+  "settingsDevTutorialReplayDialogTitle": "Tutorial yeniden oynatılsın mı?",
+  "settingsDevTutorialReplayDialogBody": "İlerlemen (binalar, upgrade'ler, Crumbs) kaybolmaz. Yalnız tutorial adımları yeniden gösterilir.",
+  "settingsDevTutorialReplayCancel": "Vazgeç",
+  "settingsDevTutorialReplayConfirm": "Evet, yeniden oyna"
 }
