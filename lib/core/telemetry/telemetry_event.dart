@@ -68,15 +68,22 @@ class SessionEnd extends TelemetryEvent {
 }
 
 class TutorialStarted extends TelemetryEvent {
-  const TutorialStarted({required this.installId});
+  const TutorialStarted({
+    required this.installId,
+    required this.isReplay,
+  });
 
   final String installId;
+  final bool isReplay;
 
   @override
   String get eventName => 'tutorial_started';
 
   @override
-  Map<String, Object?> get payload => {'install_id': installId};
+  Map<String, Object?> get payload => {
+        'install_id': installId,
+        'is_replay': isReplay,
+      };
 }
 
 class TutorialCompleted extends TelemetryEvent {
@@ -98,5 +105,52 @@ class TutorialCompleted extends TelemetryEvent {
         'install_id': installId,
         'skipped': skipped,
         'duration_ms': durationMs,
+      };
+}
+
+class PurchaseMade extends TelemetryEvent {
+  const PurchaseMade({
+    required this.installId,
+    required this.buildingId,
+    required this.cost,
+    required this.ownedAfter,
+  });
+
+  final String installId;
+  final String buildingId;
+  final int cost;
+  final int ownedAfter;
+
+  @override
+  String get eventName => 'purchase_made';
+
+  @override
+  Map<String, Object?> get payload => {
+        'install_id': installId,
+        'building_id': buildingId,
+        'cost': cost,
+        'owned_after': ownedAfter,
+      };
+}
+
+class UpgradePurchased extends TelemetryEvent {
+  const UpgradePurchased({
+    required this.installId,
+    required this.upgradeId,
+    required this.cost,
+  });
+
+  final String installId;
+  final String upgradeId;
+  final int cost;
+
+  @override
+  String get eventName => 'upgrade_purchased';
+
+  @override
+  Map<String, Object?> get payload => {
+        'install_id': installId,
+        'upgrade_id': upgradeId,
+        'cost': cost,
       };
 }

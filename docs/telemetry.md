@@ -315,6 +315,14 @@ Fired once when `TutorialScaffold` postFrame callback triggers `TutorialNotifier
 |---|---|---|
 | install_id | String | Same rule |
 
+### tutorial_started (updated B4)
+Fired once when `TutorialScaffold` postFrame callback transitions to `tapCupcake`. `isReplay` B4'te required field.
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | Same rule |
+| is_replay | bool (→ int coerced in Firebase: 1/0) | `reset()` sonrası start → true; fresh install → false. Cohort analytics: `WHERE is_replay=0` → genuine funnel denominator [I20] |
+
 ### tutorial_completed
 Fired when user completes Step 3 (`InfoCardOverlay` "Anladım" CTA) OR taps Skip (`CoachMarkOverlay` "Geç" — Step 1 only).
 
@@ -324,7 +332,29 @@ Fired when user completes Step 3 (`InfoCardOverlay` "Anladım" CTA) OR taps Skip
 | skipped | bool | `true` if user pressed Skip |
 | duration_ms | int | Time from `tutorial_started` to completion. **Note:** `0` when widget mid-tutorial remount occurs — downstream analytics may filter these edge cases |
 
+### purchase_made (B4)
+Fired on successful `GameStateNotifier.buyBuilding` — failed/rejected path'lerde emit YOK ([I19]).
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | Non-null rule |
+| building_id | String | Bina ID (`crumb_collector`, `oven`, `bakery_line`) |
+| cost | int | Crumbs cost at time of purchase (economy §5 baseCost × growth^owned) |
+| owned_after | int | Bina count after this purchase |
+
+### upgrade_purchased (B4)
+Fired on successful `GameStateNotifier.buyUpgrade` — already owned / insufficient crumbs / unknown id path'lerinde emit YOK ([I19]).
+
+| Field | Type | Description |
+|---|---|---|
+| install_id | String | Non-null rule |
+| upgrade_id | String | Upgrade ID (`golden_recipe_i`, ...) |
+| cost | int | Crumbs cost |
+
 ### Invariants
 - **[I1]** `install_id` never null in payload; sentinel `<not-loaded>` reserved for unresolved provider state (integration test rejects this value in production emission)
 - **[I6]** `onPause` ordering: `persistNow` ÖNCE, `SessionEnd` SONRA (process-kill during pause guarantees disk save; telemetry loss acceptable)
 - **[I15]** `SessionStart.install_id_age_ms >= 0` production path'te; `kAgeNotLoaded` (-1) sentinel yalnız bootstrap race state'inde görülebilir — integration test bu sentinel'ı reddeder
+- **[I18]** `TutorialNotifier.reset()` AppInstall re-emit ETMEZ — `FirstBootNotifier` ve `TutorialNotifier` prefs disjoint
+- **[I19]** PurchaseMade + UpgradePurchased yalnız successful purchase path'ten emit — failed/rejected (canAfford=false / alreadyOwned / unknown id) emission YOK
+- **[I20]** `TutorialStarted.isReplay` single-use flag — `reset()` sonrası ilk `start()` emit true, sonraki false (`consumeReplayFlag` pattern)

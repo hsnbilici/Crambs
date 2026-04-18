@@ -333,6 +333,90 @@ abstract class AppStrings {
   /// In tr, this message translates to:
   /// **'Anladım'**
   String get tutorialCloseButton;
+
+  /// No description provided for @settingsAudioSection.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ses ve Müzik'**
+  String get settingsAudioSection;
+
+  /// No description provided for @settingsAudioMusicToggle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Müzik'**
+  String get settingsAudioMusicToggle;
+
+  /// No description provided for @settingsAudioSfxToggle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Efektler'**
+  String get settingsAudioSfxToggle;
+
+  /// No description provided for @settingsAudioStubHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yakında aktif olacak'**
+  String get settingsAudioStubHint;
+
+  /// No description provided for @settingsDevSection.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geliştirici'**
+  String get settingsDevSection;
+
+  /// No description provided for @settingsDevTestCrash.
+  ///
+  /// In tr, this message translates to:
+  /// **'Test Crash Gönder'**
+  String get settingsDevTestCrash;
+
+  /// No description provided for @settingsDevTestCrashHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Crashlytics doğrulama — cihaz yeniden açıldığında rapor gönderilir'**
+  String get settingsDevTestCrashHint;
+
+  /// No description provided for @settingsDevTestCrashNotInit.
+  ///
+  /// In tr, this message translates to:
+  /// **'Firebase başlatılmadı — crash rapor edilmez'**
+  String get settingsDevTestCrashNotInit;
+
+  /// No description provided for @settingsDevTutorialReplay.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tutorial\'i Tekrar Oyna'**
+  String get settingsDevTutorialReplay;
+
+  /// No description provided for @settingsDevTutorialReplayHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'3 adımlı girişi yeniden başlatır'**
+  String get settingsDevTutorialReplayHint;
+
+  /// No description provided for @settingsDevTutorialReplayDialogTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tutorial yeniden oynatılsın mı?'**
+  String get settingsDevTutorialReplayDialogTitle;
+
+  /// No description provided for @settingsDevTutorialReplayDialogBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'İlerlemen (binalar, upgrade\'ler, Crumbs) kaybolmaz. Yalnız tutorial adımları yeniden gösterilir.'**
+  String get settingsDevTutorialReplayDialogBody;
+
+  /// No description provided for @settingsDevTutorialReplayCancel.
+  ///
+  /// In tr, this message translates to:
+  /// **'Vazgeç'**
+  String get settingsDevTutorialReplayCancel;
+
+  /// No description provided for @settingsDevTutorialReplayConfirm.
+  ///
+  /// In tr, this message translates to:
+  /// **'Evet, yeniden oyna'**
+  String get settingsDevTutorialReplayConfirm;
 }
 
 class _AppStringsDelegate extends LocalizationsDelegate<AppStrings> {

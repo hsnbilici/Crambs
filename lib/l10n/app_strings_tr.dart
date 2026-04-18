@@ -137,4 +137,51 @@ class AppStringsTr extends AppStrings {
 
   @override
   String get tutorialCloseButton => 'Anladım';
+
+  @override
+  String get settingsAudioSection => 'Ses ve Müzik';
+
+  @override
+  String get settingsAudioMusicToggle => 'Müzik';
+
+  @override
+  String get settingsAudioSfxToggle => 'Efektler';
+
+  @override
+  String get settingsAudioStubHint => 'Yakında aktif olacak';
+
+  @override
+  String get settingsDevSection => 'Geliştirici';
+
+  @override
+  String get settingsDevTestCrash => 'Test Crash Gönder';
+
+  @override
+  String get settingsDevTestCrashHint =>
+      'Crashlytics doğrulama — cihaz yeniden açıldığında rapor gönderilir';
+
+  @override
+  String get settingsDevTestCrashNotInit =>
+      'Firebase başlatılmadı — crash rapor edilmez';
+
+  @override
+  String get settingsDevTutorialReplay => 'Tutorial\'i Tekrar Oyna';
+
+  @override
+  String get settingsDevTutorialReplayHint =>
+      '3 adımlı girişi yeniden başlatır';
+
+  @override
+  String get settingsDevTutorialReplayDialogTitle =>
+      'Tutorial yeniden oynatılsın mı?';
+
+  @override
+  String get settingsDevTutorialReplayDialogBody =>
+      'İlerlemen (binalar, upgrade\'ler, Crumbs) kaybolmaz. Yalnız tutorial adımları yeniden gösterilir.';
+
+  @override
+  String get settingsDevTutorialReplayCancel => 'Vazgeç';
+
+  @override
+  String get settingsDevTutorialReplayConfirm => 'Evet, yeniden oyna';
 }

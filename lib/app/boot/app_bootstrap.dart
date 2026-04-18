@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:crumbs/app/boot/firebase_bootstrap.dart';
+import 'package:crumbs/core/launch/first_boot_notifier.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/core/telemetry/telemetry_providers.dart';
 import 'package:crumbs/core/tutorial/tutorial_notifier.dart';
@@ -34,6 +35,12 @@ class AppBootstrap {
         : ProviderContainer();
 
     await container.read(installIdProvider.notifier).ensureLoaded();
+
+    // B4 YENİ — step b': FirstBootNotifier observe (AppInstall trigger
+    // source — tutorial state'inden disjoint, invariant I18)
+    final isFirstLaunch =
+        await container.read(firstBootProvider.notifier).ensureObserved();
+
     final gs = await container.read(gameStateNotifierProvider.future);
     await container
         .read(installIdProvider.notifier)
@@ -48,10 +55,10 @@ class AppBootstrap {
       );
     }
 
-    final tutorialState =
-        await container.read(tutorialNotifierProvider.future);
+    await container.read(tutorialNotifierProvider.future);
 
-    final isFirstLaunch = !tutorialState.firstLaunchMarked;
+    // B4 DEĞİŞTİ — isFirstLaunch firstBootProvider'dan okunur (step b'),
+    // tutorialState.firstLaunchMarked usage kaldırıldı
     container
         .read(sessionControllerProvider)
         .onLaunch(isFirstLaunch: isFirstLaunch);

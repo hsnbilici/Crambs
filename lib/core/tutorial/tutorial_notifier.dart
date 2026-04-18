@@ -9,6 +9,34 @@ class TutorialNotifier extends AsyncNotifier<TutorialState> {
   static const _prefKeyFirstLaunch = 'crumbs.first_launch_marked';
   static const _prefKeyCompleted = 'crumbs.tutorial_completed';
 
+  bool _replayTriggered = false;
+
+  /// Bir sonraki `start()` emit'inde `isReplay` ne olacak — `reset()` sonrası
+  /// true döner, ilk okuyucu false'a sıfırlar (single-use). Invariant I20.
+  bool consumeReplayFlag() {
+    final value = _replayTriggered;
+    _replayTriggered = false;
+    return value;
+  }
+
+  /// Tutorial state'i tamamen sıfırlar — Settings > Developer "Tutorial'i
+  /// tekrar oyna" dan tetiklenir. Prefs clear + replay flag set + fresh
+  /// state. FirstBootNotifier'a dokunulmaz — AppInstall re-emit olmaz I18.
+  ///
+  /// Concurrent call'lar SharedPreferences internal lock ile serialize —
+  /// idempotent.
+  Future<void> reset() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefKeyFirstLaunch);
+    await prefs.remove(_prefKeyCompleted);
+    _replayTriggered = true;
+    state = const AsyncData(TutorialState(
+      firstLaunchMarked: false,
+      tutorialCompleted: false,
+      currentStep: null,
+    ));
+  }
+
   @override
   Future<TutorialState> build() async {
     final prefs = await SharedPreferences.getInstance();

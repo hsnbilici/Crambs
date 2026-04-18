@@ -80,3 +80,35 @@ Geçmiş planlar (tümü tamamlandı, git history'de):
 **Kural:** `git push`, PR açma, branch silme gibi remote'u etkileyen aksiyonlar user'ın explicit onayı olmadan yapılmaz. "Push edeyim mi?" diye sorulur. Tek seferlik onay verilse dahi sonraki oturumda tekrar sorulur — onay scope-limited.
 
 **Nasıl uygulanır:** Her remote-touching adımdan önce özet göster + tetikleme komutu öner + "çalıştırayım mı?" sor.
+
+---
+
+## Sprint B3 → B4 review takeaways (2026-04-18)
+
+### Ders: FirebaseBootstrap static state — widget test coverage limitation
+**Problem:** `FirebaseBootstrap._initialized` static + private. Widget test'te `isInitialized=true` simulate edilemez — Crashlytics Test Crash button full path manual QA gerekir.
+
+**Kök neden:** Static state sharing across tests + private field access pattern. Test isolation için provider wrapper gerekir.
+
+**Önleme kuralı:** Production state'i provider wrapper'a koy (static flag yalnız pre-provider init ownership için). B5 followup: FirebaseBootstrap state → `Provider<bool>`.
+
+### Ders: Firebase compliance regex invariant — scaling pattern
+**Problem:** TelemetryEvent eklendiğinde regex invariant test events list manuel güncellenir. Unutulursa new event Firebase Analytics kurallarına uymayabilir.
+
+**Kök neden:** Parameterized test events list hard-coded; sealed class introspection yok.
+
+**Önleme kuralı:** Yeni `TelemetryEvent` eklenirken T4-equivalent invariant test güncellemesi DoD checklist'inde olsun. Future: `TelemetryEvent.allSubtypes` registry derive edilebilirse otomatik (Dart reflection limited — pragmatic: PR template'te "events list güncel mi?" checkbox).
+
+### Ders: CI secret decode fork-safety
+**Problem:** B3 ilk deploy CI'da `firebase_options.dart` eksik → analyze fail. Fork PR'larda secret erişimi yok.
+
+**Kök neden:** Decode step `env != ''` guard ilk deploy'da vardı ama fallback (template copy) eksikti.
+
+**Önleme kuralı:** Secret-dependent decode step her zaman fork-safe fallback'e sahip olmalı — template copy (`cp .template target`). Fork PR'larda template default path aktif. B3-T11-fix bu pattern'i kesinleştirdi.
+
+### Ders: Atomic task chain compile-red window management
+**Problem:** B3 T6→T7→T14 ve B4 T3→T4→T5→T6→T7 gibi shape change task'lar compile-red intermediate state'ler üretir. Subagent'a "bu beklenen" demezsek implementer panic eder.
+
+**Kök neden:** TDD strict + atomic commit discipline — shape change commit'i tek başına kırık bırakır, downstream fix commit'leri takip eder.
+
+**Önleme kuralı:** Plan task açıklamasında "compile-green restore T<n>'e kadar" açıkça yaz. Subagent brief'ine "Analyze expected FAIL after this commit — T<next> resolves" explicit note. B4 T3 bu pattern'i dokümante etti.

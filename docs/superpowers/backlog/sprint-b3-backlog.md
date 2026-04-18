@@ -13,8 +13,8 @@
 - ✅ **Firebase Analytics provider wiring** — Sprint B3 T3/T4/T8 (FirebaseBootstrap + FirebaseAnalyticsLogger + 3-state gate)
 - ✅ **Crashlytics integration** — Sprint B3 T3 (phase 3 FlutterError.onError + PlatformDispatcher.onError) + T10 (setUserIdentifier user identity)
 - ✅ **`install_id_age_ms` payload property** — Sprint B3 T5/T6/T7 (InstallIdNotifier._createdAt + SessionStart.installIdAgeMs + clock-backward clamp; AppInstall'dan drop edildi, SessionStart-only — cohort retention analytics primary)
-- [ ] **Settings → "Tutorial'i tekrar oyna" toggle** — `TutorialNotifier.reset()` eklenir (tutorialCompleted=false + currentStep=null + prefs clear); Settings ekranında switch (B4)
-- [ ] **Purchase / Upgrade / ResearchComplete event'leri** — telemetry event kataloğu genişlemesi (payload: id, cost, timestamp) (B4)
+- ✅ **Settings → "Tutorial'i tekrar oyna" toggle** — Sprint B4 T6 + T10 (`TutorialNotifier.reset()` + Settings Developer confirmation dialog)
+- ✅ **Purchase / Upgrade event'leri** — Sprint B4 T3 + T5 (PurchaseMade + UpgradePurchased, [I19] emission gate). **ResearchComplete** Sprint C'ye deferred (research impl'yle birlikte)
 - [ ] **GameState hydration side-effect telemetry** — offline_progress + save_recovery event'leri. B2'de `gameStateNotifierProvider.build()` telemetry emit ETMEZ; B4'te provider listen pattern eklenir (SessionStart → hydration events ordering deterministik)
 - [ ] **Step 2 granularity split** — `openShop` → `openShop` + `buyFirstBuilding` ayrımı (tutorial funnel drop-off analytics için gerekirse) (B4)
 

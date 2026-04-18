@@ -56,13 +56,18 @@ void main() {
 
   group('TelemetryEvent — TutorialStarted', () {
     test('eventName is tutorial_started', () {
-      const e = TutorialStarted(installId: 'abc');
+      const e = TutorialStarted(installId: 'abc', isReplay: false);
       expect(e.eventName, 'tutorial_started');
     });
 
-    test('payload has install_id only', () {
-      const e = TutorialStarted(installId: 'abc');
-      expect(e.payload, {'install_id': 'abc'});
+    test('payload has install_id + is_replay', () {
+      const e = TutorialStarted(installId: 'abc', isReplay: false);
+      expect(e.payload, {'install_id': 'abc', 'is_replay': false});
+    });
+
+    test('isReplay=true propagates in payload', () {
+      const e = TutorialStarted(installId: 'abc', isReplay: true);
+      expect(e.payload['is_replay'], true);
     });
   });
 
@@ -90,6 +95,57 @@ void main() {
     });
   });
 
+  group('TelemetryEvent — PurchaseMade (B4)', () {
+    test('eventName is purchase_made', () {
+      const e = PurchaseMade(
+        installId: 'abc',
+        buildingId: 'crumb_collector',
+        cost: 15,
+        ownedAfter: 1,
+      );
+      expect(e.eventName, 'purchase_made');
+    });
+
+    test('payload has install_id, building_id, cost, owned_after', () {
+      const e = PurchaseMade(
+        installId: 'abc',
+        buildingId: 'oven',
+        cost: 120,
+        ownedAfter: 3,
+      );
+      expect(e.payload, {
+        'install_id': 'abc',
+        'building_id': 'oven',
+        'cost': 120,
+        'owned_after': 3,
+      });
+    });
+  });
+
+  group('TelemetryEvent — UpgradePurchased (B4)', () {
+    test('eventName is upgrade_purchased', () {
+      const e = UpgradePurchased(
+        installId: 'abc',
+        upgradeId: 'golden_recipe_i',
+        cost: 200,
+      );
+      expect(e.eventName, 'upgrade_purchased');
+    });
+
+    test('payload has install_id, upgrade_id, cost', () {
+      const e = UpgradePurchased(
+        installId: 'abc',
+        upgradeId: 'golden_recipe_i',
+        cost: 200,
+      );
+      expect(e.payload, {
+        'install_id': 'abc',
+        'upgrade_id': 'golden_recipe_i',
+        'cost': 200,
+      });
+    });
+  });
+
   test('TelemetryEvent is sealed — pattern match exhaustive', () {
     const TelemetryEvent e = AppInstall(installId: 'x', platform: 'ios');
     final name = switch (e) {
@@ -98,6 +154,8 @@ void main() {
       SessionEnd() => 'end',
       TutorialStarted() => 'tut_start',
       TutorialCompleted() => 'tut_done',
+      PurchaseMade() => 'purchase',
+      UpgradePurchased() => 'upgrade',
     };
     expect(name, 'install');
   });
