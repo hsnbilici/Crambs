@@ -4,6 +4,11 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- Google Mobile Ads — test AdMob App ID (Google resmi sample).
+	     Real AdMob account setup post-MVP; FR-14 rewarded ads için asıl ID
+	     oluşturulduğunda buraya yazılır. Eksikse SDK boot'ta hard crash. -->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
