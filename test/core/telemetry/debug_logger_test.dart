@@ -48,7 +48,7 @@ void main() {
             installIdAgeMs: 0,
           ),
         )
-        ..log(const TutorialStarted(installId: 'a'))
+        ..log(const TutorialStarted(installId: 'a', isReplay: false))
         ..log(
           const SessionEnd(
             installId: 'a',

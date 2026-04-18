@@ -59,6 +59,56 @@ void main() {
             },
           )).called(1);
     });
+
+    test('PurchaseMade → logEvent with 4-field payload (B4)', () {
+      logger.log(const PurchaseMade(
+        installId: 'abc',
+        buildingId: 'oven',
+        cost: 120,
+        ownedAfter: 3,
+      ));
+      verify(() => analytics.logEvent(
+            name: 'purchase_made',
+            parameters: {
+              'install_id': 'abc',
+              'building_id': 'oven',
+              'cost': 120,
+              'owned_after': 3,
+            },
+          )).called(1);
+    });
+
+    test('UpgradePurchased → logEvent with 3-field payload (B4)', () {
+      logger.log(const UpgradePurchased(
+        installId: 'abc',
+        upgradeId: 'golden_recipe_i',
+        cost: 200,
+      ));
+      verify(() => analytics.logEvent(
+            name: 'upgrade_purchased',
+            parameters: {
+              'install_id': 'abc',
+              'upgrade_id': 'golden_recipe_i',
+              'cost': 200,
+            },
+          )).called(1);
+    });
+
+    test('TutorialStarted isReplay=true → coerced to int 1 (B4)', () {
+      logger.log(const TutorialStarted(installId: 'abc', isReplay: true));
+      verify(() => analytics.logEvent(
+            name: 'tutorial_started',
+            parameters: {'install_id': 'abc', 'is_replay': 1},
+          )).called(1);
+    });
+
+    test('TutorialStarted isReplay=false → coerced to int 0 (B4)', () {
+      logger.log(const TutorialStarted(installId: 'abc', isReplay: false));
+      verify(() => analytics.logEvent(
+            name: 'tutorial_started',
+            parameters: {'install_id': 'abc', 'is_replay': 0},
+          )).called(1);
+    });
   });
 
   group('FirebaseAnalyticsLogger — beginSession/endSession no-op', () {
@@ -81,12 +131,24 @@ void main() {
 
   group('FirebaseAnalyticsLogger — Firebase compliance invariant', () {
     // B2 event'lerinin (SessionStart B3'te genişler, T6) name invariant'ı.
-    // SessionStart T6 sonrası bu liste'ye eklenir.
+    // B4: SessionStart + PurchaseMade + UpgradePurchased eklendi.
     final events = <TelemetryEvent>[
       const AppInstall(installId: 'x', platform: 'ios'),
+      const SessionStart(installId: 'x', sessionId: 'y', installIdAgeMs: 0),
       const SessionEnd(installId: 'x', sessionId: 'y', durationMs: 0),
-      const TutorialStarted(installId: 'x'),
+      const TutorialStarted(installId: 'x', isReplay: false),
       const TutorialCompleted(installId: 'x', skipped: false, durationMs: 0),
+      const PurchaseMade(
+        installId: 'x',
+        buildingId: 'crumb_collector',
+        cost: 15,
+        ownedAfter: 1,
+      ),
+      const UpgradePurchased(
+        installId: 'x',
+        upgradeId: 'golden_recipe_i',
+        cost: 200,
+      ),
     ];
 
     final nameRegex = RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{0,39}$');
