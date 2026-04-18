@@ -23,6 +23,20 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Decode Firebase config (secrets → files)
+        if: ${{ env.FIREBASE_OPTIONS_DART_B64 != '' }}
+        env:
+          FIREBASE_OPTIONS_DART_B64: ${{ secrets.FIREBASE_OPTIONS_DART_B64 }}
+          IOS_GSI_PLIST_B64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST_B64 }}
+          ANDROID_GSJ_JSON_B64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}
+        # Fork PR güvenliği: secrets erişimi yok → env empty → step skip.
+        # Template throw + FirebaseBootstrap try/catch fallback devreye girer.
+        run: |
+          set +x  # trace disable — base64 env secret'ın workflow log'una sızmasını engelle
+          echo "$FIREBASE_OPTIONS_DART_B64" | base64 -d > lib/firebase_options.dart
+          echo "$IOS_GSI_PLIST_B64" | base64 -d > ios/Runner/GoogleService-Info.plist
+          echo "$ANDROID_GSJ_JSON_B64" | base64 -d > android/app/google-services.json
+
       - name: Bağımlılıkları yükle
         run: flutter pub get
 
