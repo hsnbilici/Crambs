@@ -52,7 +52,7 @@ void main() {
   });
 
   group('TutorialNotifier — start()', () {
-    test('fresh install → currentStep=tapCupcake + firstLaunchMarked=true',
+    test('fresh install → currentStep=tapHero + firstLaunchMarked=true',
         () async {
       SharedPreferences.setMockInitialValues({});
       final c = buildContainer();
@@ -60,7 +60,7 @@ void main() {
       await c.read(tutorialNotifierProvider.notifier).start();
 
       final state = c.read(tutorialNotifierProvider).requireValue;
-      expect(state.currentStep, TutorialStep.tapCupcake);
+      expect(state.currentStep, TutorialStep.tapHero);
       expect(state.firstLaunchMarked, true);
 
       final prefs = await SharedPreferences.getInstance();
@@ -76,7 +76,7 @@ void main() {
       await notifier.start();
       await notifier.start();
       expect(c.read(tutorialNotifierProvider).requireValue.currentStep,
-          TutorialStep.tapCupcake);
+          TutorialStep.tapHero);
     });
 
     test('no-op if firstLaunchMarked already true', () async {
@@ -110,11 +110,11 @@ void main() {
       return c;
     }
 
-    test('tapCupcake → openShop', () async {
+    test('tapHero → openShop', () async {
       final c = await startedContainer();
       c
           .read(tutorialNotifierProvider.notifier)
-          .advance(from: TutorialStep.tapCupcake);
+          .advance(from: TutorialStep.tapHero);
       expect(c.read(tutorialNotifierProvider).requireValue.currentStep,
           TutorialStep.openShop);
     });
@@ -122,7 +122,7 @@ void main() {
     test('openShop → explainCrumbs', () async {
       final c = await startedContainer();
       c.read(tutorialNotifierProvider.notifier)
-        ..advance(from: TutorialStep.tapCupcake)
+        ..advance(from: TutorialStep.tapHero)
         ..advance(from: TutorialStep.openShop);
       expect(c.read(tutorialNotifierProvider).requireValue.currentStep,
           TutorialStep.explainCrumbs);
@@ -134,13 +134,13 @@ void main() {
           .read(tutorialNotifierProvider.notifier)
           .advance(from: TutorialStep.explainCrumbs);
       expect(c.read(tutorialNotifierProvider).requireValue.currentStep,
-          TutorialStep.tapCupcake);
+          TutorialStep.tapHero);
     });
 
     test('explainCrumbs advance → currentStep becomes null', () async {
       final c = await startedContainer();
       c.read(tutorialNotifierProvider.notifier)
-        ..advance(from: TutorialStep.tapCupcake)
+        ..advance(from: TutorialStep.tapHero)
         ..advance(from: TutorialStep.openShop)
         ..advance(from: TutorialStep.explainCrumbs);
       expect(c.read(tutorialNotifierProvider).requireValue.currentStep, null);

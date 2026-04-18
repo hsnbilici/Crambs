@@ -38,7 +38,7 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
       _startInvoked = true;
       await ref.read(tutorialNotifierProvider.notifier).start();
       final postState = ref.read(tutorialNotifierProvider).value;
-      if (postState?.currentStep == TutorialStep.tapCupcake) {
+      if (postState?.currentStep == TutorialStep.tapHero) {
         _startedAt = DateTime.now();
         // B4: isReplay single-use flag — reset() sonrası ilk emit true [I20]
         final isReplay = ref
@@ -68,7 +68,7 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
       if (step == null) return;
       final prevCrumbs = prev?.value?.inventory.r1Crumbs ?? 0;
       final nextCrumbs = next.value?.inventory.r1Crumbs ?? 0;
-      if (step == TutorialStep.tapCupcake && nextCrumbs > prevCrumbs) {
+      if (step == TutorialStep.tapHero && nextCrumbs > prevCrumbs) {
         ref.read(tutorialNotifierProvider.notifier).advance(from: step);
       }
       final prevOwned = prev?.value?.buildings.owned['crumb_collector'] ?? 0;
@@ -91,8 +91,8 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
     final notifier = ref.read(tutorialNotifierProvider.notifier);
 
     return switch (step) {
-      TutorialStep.tapCupcake => CoachMarkOverlay(
-          targetKey: kTutorialCupcakeKey,
+      TutorialStep.tapHero => CoachMarkOverlay(
+          targetKey: kTutorialHeroKey,
           message: s.tutorialStep1Message,
           shape: HaloShape.circle,
           onSkip: () => _onSkipPressed(notifier),

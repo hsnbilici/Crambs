@@ -46,7 +46,7 @@ class HomePage extends ConsumerWidget {
           Column(
             children: [
               const CrumbCounterHeader(),
-              Expanded(child: TapArea(key: kTutorialCupcakeKey)),
+              Expanded(child: TapArea(key: kTutorialHeroKey)),
               const SizedBox(height: 8),
             ],
           ),

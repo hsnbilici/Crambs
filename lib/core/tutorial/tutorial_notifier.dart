@@ -60,7 +60,7 @@ class TutorialNotifier extends AsyncNotifier<TutorialState> {
     await prefs.setBool(_prefKeyFirstLaunch, true);
     state = AsyncData(current.copyWith(
       firstLaunchMarked: true,
-      currentStep: TutorialStep.tapCupcake,
+      currentStep: TutorialStep.tapHero,
     ));
   }
 
@@ -90,7 +90,7 @@ class TutorialNotifier extends AsyncNotifier<TutorialState> {
 
   TutorialStep? _nextStep(TutorialStep current) {
     return switch (current) {
-      TutorialStep.tapCupcake => TutorialStep.openShop,
+      TutorialStep.tapHero => TutorialStep.openShop,
       TutorialStep.openShop => TutorialStep.explainCrumbs,
       TutorialStep.explainCrumbs => null,
     };

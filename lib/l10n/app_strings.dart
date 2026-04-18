@@ -103,7 +103,7 @@ abstract class AppStrings {
   /// No description provided for @tapHint.
   ///
   /// In tr, this message translates to:
-  /// **'Cupcake\'e dokun, Crumbs kazan'**
+  /// **'Fırına dokun, Crumb kazan'**
   String get tapHint;
 
   /// No description provided for @welcomeBack.
@@ -295,7 +295,7 @@ abstract class AppStrings {
   /// No description provided for @tutorialStep1Message.
   ///
   /// In tr, this message translates to:
-  /// **'Crumb kazanmak için cupcake\'e dokun!'**
+  /// **'Crumb kazanmak için fırına dokun!'**
   String get tutorialStep1Message;
 
   /// No description provided for @tutorialStep2NavMessage.

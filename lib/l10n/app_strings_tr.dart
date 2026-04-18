@@ -12,7 +12,7 @@ class AppStringsTr extends AppStrings {
   String get appTitle => 'Crumbs';
 
   @override
-  String get tapHint => 'Cupcake\'e dokun, Crumbs kazan';
+  String get tapHint => 'Fırına dokun, Crumb kazan';
 
   @override
   String welcomeBack(String amount, String duration) {
@@ -117,7 +117,7 @@ class AppStringsTr extends AppStrings {
   String get errorScreenRetry => 'Tekrar dene';
 
   @override
-  String get tutorialStep1Message => 'Crumb kazanmak için cupcake\'e dokun!';
+  String get tutorialStep1Message => 'Crumb kazanmak için fırına dokun!';
 
   @override
   String get tutorialStep2NavMessage => 'Dükkân\'a git ve ilk üreticini al';

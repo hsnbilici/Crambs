@@ -61,7 +61,7 @@ void main() {
 
       // Hydration + start() executes via postFrame in TutorialScaffold.
       final state = c.read(tutorialNotifierProvider).requireValue;
-      expect(state.currentStep, TutorialStep.tapCupcake);
+      expect(state.currentStep, TutorialStep.tapHero);
       expect(state.firstLaunchMarked, true);
     });
 

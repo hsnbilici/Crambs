@@ -24,10 +24,10 @@ void main() {
         tutorialCompleted: false,
         currentStep: null,
       );
-      final b = a.copyWith(currentStep: TutorialStep.tapCupcake);
+      final b = a.copyWith(currentStep: TutorialStep.tapHero);
       expect(b.firstLaunchMarked, true);
       expect(b.tutorialCompleted, false);
-      expect(b.currentStep, TutorialStep.tapCupcake);
+      expect(b.currentStep, TutorialStep.tapHero);
     });
   });
 
@@ -37,7 +37,7 @@ void main() {
       expect(
         TutorialStep.values,
         containsAll([
-          TutorialStep.tapCupcake,
+          TutorialStep.tapHero,
           TutorialStep.openShop,
           TutorialStep.explainCrumbs,
         ]),

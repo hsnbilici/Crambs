@@ -1,7 +1,7 @@
 {
   "@@locale": "tr",
   "appTitle": "Crumbs",
-  "tapHint": "Cupcake'e dokun, Crumbs kazan",
+  "tapHint": "Fırına dokun, Crumb kazan",
   "welcomeBack": "Yokken {amount} Crumb kazandın ({duration})",
   "@welcomeBack": {
     "placeholders": {
@@ -42,7 +42,7 @@
   "errorScreenTitle": "Beklenmedik bir hata",
   "errorScreenBody": "Oyun başlatılamadı. Tekrar denemek ister misin?",
   "errorScreenRetry": "Tekrar dene",
-  "tutorialStep1Message": "Crumb kazanmak için cupcake'e dokun!",
+  "tutorialStep1Message": "Crumb kazanmak için fırına dokun!",
   "tutorialStep2NavMessage": "Dükkân'a git ve ilk üreticini al",
   "tutorialStep2ShopMessage": "Crumb Collector'ı satın al",
   "tutorialStep3Title": "Neden Crumb kazanıyorsun?",

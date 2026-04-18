@@ -47,7 +47,7 @@ void main() {
       // Mount sim: TutorialScaffold postFrame start()
       await c.read(tutorialNotifierProvider.notifier).start();
       if (c.read(tutorialNotifierProvider).value?.currentStep ==
-          TutorialStep.tapCupcake) {
+          TutorialStep.tapHero) {
         final isReplay = c
             .read(tutorialNotifierProvider.notifier)
             .consumeReplayFlag();
