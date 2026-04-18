@@ -91,9 +91,44 @@ abstract interface class AudioEngine {
 - Init AudioPool warm paralel: `await Future.wait([for (final cue in SfxCue.values) _initPool(cue)])`
 - Dispose: tüm pool'lar + ambient release, idempotent
 
-**Failure sentinel:**
-- init fail → `_failed = true` → tüm play metodları silent no-op
-- dispose sonrası play → `_failed = true` veya `DisposedEngineException` (plan'da karar)
+**Init race guard — `_initCompleter` pattern:**
+
+Lazy `Future.microtask(engine.init())` runApp sonrası non-blocking başlar. Kullanıcı <500ms içinde Settings'e girip music toggle'ı açarsa, `audioControllerProvider.startAmbient()` init tamamlanmadan çağrılabilir. Her public metod init completer'ı await eder — race'siz, cold start latency değişmez.
+
+```dart
+class AudioplayersEngine implements AudioEngine {
+  Completer<void>? _initCompleter;
+  bool _failed = false;
+  bool _disposed = false;
+
+  @override
+  Future<void> init() {
+    _initCompleter ??= Completer<void>();
+    _bootstrap().then(
+      (_) => _initCompleter!.complete(),
+      onError: (e, st) {
+        _failed = true;
+        _initCompleter!.complete();  // complete even on failure so awaiters proceed
+        debugPrint('AudioEngine init failed: $e');
+      },
+    );
+    return _initCompleter!.future;
+  }
+
+  @override
+  Future<void> playOneShot(String path, {double volume = 1.0}) async {
+    await _initCompleter?.future;   // wait if init in-flight
+    if (_failed || _disposed) return;  // silent no-op
+    // ... actual play
+  }
+  // startLoop, resumeLoop, setLoopVolume — aynı pattern
+}
+```
+
+**Failure sentinel — kararlaştırıldı:**
+- init fail → `_failed = true` → tüm play metodları silent no-op (throw etmez)
+- dispose sonrası play → `_disposed = true` → silent no-op (DisposedEngineException atılmaz)
+- Gerekçe: B3 `FirebaseBootstrap.isInitialized` pattern'iyle paralel; gameplay etkilenmez, test edilebilir, production error log kirliliği yok. Invariant [I21].
 
 ### 2.2 AudioController
 
@@ -244,26 +279,38 @@ main():
 
 **Ambient ilk start:** Boot'ta AUTO-START yok. Default `musicEnabled=false` olduğu için fresh install sessiz. Kullanıcı Settings'te toggle açarsa `updateSettings` diff devreye girer → `startAmbient()`.
 
+**Race guard:** Kullanıcı init <500ms'de Settings'e girip toggle açarsa, `startAmbient` engine'deki `_initCompleter.future` await'ine takılır (§2.1). Init tamamlandığında engine çağrısı otomatik ilerler; `_failed=true` durumda silent no-op. Oyuncu tarafında "bir an sessiz, sonra ses geldi" latency = init süresi (~200-500ms) — acceptable.
+
 **Hydrate race guard (küçük):** Kullanıcı fresh install'da Settings'e hydrate tamamlanmadan girerse loading state gösterilir (CircularProgressIndicator), toggle'lar gizlenir. Plan'da `AsyncValue.when(loading: ..., data: ...)` pattern.
 
 ### 3.2 AppLifecycleGate audio hooks
 
 ```dart
 Future<void> _onPause() async {
-  await ref.read(audioControllerProvider).pauseAmbient();  // YENİ — en önce
-  await ref.read(saveRepositoryProvider).persistNow();      // mevcut (invariant [I6])
+  // YENİ — en önce, ama persist'i bloklamasın: audio fail silent absorbed.
+  try {
+    await ref.read(audioControllerProvider).pauseAmbient();
+  } catch (e, st) {
+    debugPrint('audio pauseAmbient failed in _onPause: $e');
+  }
+  await ref.read(saveRepositoryProvider).persistNow();      // mevcut, kritik (invariant [I6])
   ref.read(sessionControllerProvider).onPause();            // mevcut
 }
 
 void _onResume() {
   ref.read(saveRepositoryProvider).applyResumeDelta();      // mevcut
   ref.read(sessionControllerProvider).onResume();           // mevcut
-  ref.read(audioControllerProvider).resumeAmbient();        // YENİ — en sonda
+  // YENİ — en sonda; throw etse bile UI ve session zaten hazır.
+  try {
+    ref.read(audioControllerProvider).resumeAmbient();
+  } catch (e, st) {
+    debugPrint('audio resumeAmbient failed in _onResume: $e');
+  }
 }
 ```
 
-**onPause sıra gerekçesi:** Ambient pause en önce — iOS kill senaryosunda ses ortada kalmasın.
-**onResume sıra gerekçesi:** Audio en sonda — ses gelmeden UI hazır olmalı.
+**onPause sıra gerekçesi:** Ambient pause en önce — iOS kill senaryosunda ses ortada kalmasın. Try/catch zorunlu: audio hata `persistNow()`'u **asla** bloklamamalı (save kaybı [I6] ihlali). [I23] ordering invariant'ı korunur; "pauseAmbient başarısız olsa bile persist çalışır" garantisi.
+**onResume sıra gerekçesi:** Audio en sonda — ses gelmeden UI hazır olmalı. resumeAmbient fail olsa bile state + session restore edilmiş.
 
 Yeni invariant [I23] (§6).
 
@@ -391,7 +438,7 @@ Tek fake, tüm testlerde reuse. State çağrıları record eder (`oneShots: List
 **Settings UI (widget):**
 - `AsyncValue.loading` → `CircularProgressIndicator`, toggle'lar gizli
 - `AsyncValue.data` → switch'ler hizalı
-- Slider drag → `previewVolume` her frame, `setMasterVolume` 100ms sonra (fake timer)
+- Slider drag → `previewVolume` her frame, `setMasterVolume` 100ms sonra (**`fake_async` paketi ile time travel** — gerçek `Timer(100ms)` bekleme = flake riski; pubspec'e dev_dependency eklenir)
 - onChangeEnd → debounce cancel + immediate setMasterVolume
 
 **Resource leak guard (unit):**
@@ -489,7 +536,7 @@ Tek fake, tüm testlerde reuse. State çağrıları record eder (`oneShots: List
 7. Cue naming: **stepComplete** (domain-neutral, tutorialAdvance değil)
 8. Format: **.ogg tek format** B5'te, dual-format B6 polish
 9. Defaults: **musicEnabled=false, sfxEnabled=true, volume=0.7**
-10. Error cue: **düşürüldü** — industry pattern, double-negative UX
+10. Error cue: **dropped** — industry pattern (Cookie Clicker / Egg Inc / AdVenture Capitalist error screen'de ses çalmaz), double-negative UX
 11. Slider: Material default + throttled onChanged 100ms + onChangeEnd immediate
 12. Engine init: **lazy Future.microtask** runApp sonrası, cold start etkilenmez
 13. Coverage: **≥80%** (audioplayers_engine.dart excluded)
@@ -536,7 +583,7 @@ Kabaca:
 9. AppLifecycleGate pause/resume hooks + integration test [I23] ordering
 10. TapArea feedback gate rename + SFX + widget test [I22]
 11. Emit sites (shop + upgrade + tutorial, tek task 3 site)
-12. AudioSettingsSection rewrite (switches + slider + throttle + loading guard) + widget test
+12. AudioSettingsSection rewrite (switches + slider + throttle + loading guard) + widget test (+ `fake_async` dev dependency add)
 13. Placeholder asset drop (generated beep/click, 4 SFX + 1 ambient) + `docs/audio-licenses.md` + `docs/audio-plan.md`
 14. CLAUDE.md §4/§5/§12 + invariant [I21][I22][I23] dokümantasyonu
 
@@ -557,9 +604,9 @@ Yeni invariant'lar B5 kapsamında:
 ## Verification (spec-level)
 
 - **Placeholder scan:** Yok — tüm "TBD", "TODO" yerler karara bağlandı (20 resolved decision §5.3).
-- **Internal consistency:** Cue sayısı tutarlı (§2.5 4 cue, §3.4 emit sites 4 cue, §4.5 DoD 4 asset). `stepComplete` naming her section'da aynı.
+- **Internal consistency:** Cue sayısı tutarlı (§2.5 4 cue, §3.4 emit sites 4 cue, §4.5 DoD 4 asset). `stepComplete` naming her section'da aynı. Failure sentinel her 4 referansda (§2.1 impl, §2.2 controller guard, §3.6 edge case, §6 [I21]) `_failed=true` — "plan'da karar" cümlesi silindi, spec-level kesinleşti.
 - **Scope:** Tek sprint için odaklı — 12-14 task, yeni alt-subsystem yok (audio tek modül, mevcut settings/tutorial/home dosyalarına tek satır entegrasyon).
-- **Ambiguity:** Yok — slider UX (throttle 100ms), init pattern (Future.microtask), Engine dispose davranışı (idempotent), default values (musicEnabled=false) hepsi explicit.
+- **Ambiguity:** Yok — slider UX (throttle 100ms + `fake_async` test), init pattern (`Future.microtask` + `_initCompleter` race guard), Engine dispose davranışı (idempotent, `_disposed=true` silent no-op), _onPause audio fail absorption (try/catch, persist bloklanmaz), default values (musicEnabled=false) hepsi explicit.
 
 ---
 
