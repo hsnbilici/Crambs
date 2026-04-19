@@ -74,3 +74,5 @@ flutter:
   generate: true
   assets:
     - assets/
+    - assets/audio/sfx/
+    - assets/audio/music/
