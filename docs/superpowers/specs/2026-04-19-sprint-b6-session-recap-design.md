@@ -324,6 +324,10 @@ const String kActionCollect = 'collect';
 // session_recap_modal.dart
 
 Future<void> _onCollect(BuildContext context, WidgetRef ref) async {
+  // Ceremony intentionally NOT forced — pop immediate. Kullanıcı ilk 200ms
+  // içinde Collect'e tap ederse counter animation henüz peak'e ulaşmadan
+  // modal kapanır. Paternalistik "disabled 1500ms" UX reddedildi. Earned
+  // Crumbs zaten ledger'da [I25] — animation opsiyonel presentation.
   _emitActionTaken(ref, actionType: kActionCollect);
   ref.read(offlineReportProvider.notifier).clear();
   if (context.mounted) Navigator.of(context).pop();
@@ -333,6 +337,13 @@ Future<void> _onDismiss(BuildContext context, WidgetRef ref) async {
   // Explicit X tap — emit dismissed + pop. Backdrop tap / back gesture is
   // handled by SessionRecapHost.show post-return logic (defense-in-depth for
   // barrier dismiss).
+  //
+  // Idempotency guard: provider null ise (host post-return path'inden
+  // çağrılmışsa) skip — [I26] single-source clear invariant'ını korur.
+  if (ref.read(offlineReportProvider) == null) {
+    if (context.mounted) Navigator.of(context).pop();
+    return;
+  }
   _emitDismissed(ref);
   ref.read(offlineReportProvider.notifier).clear();
   if (context.mounted) Navigator.of(context).pop();
@@ -343,7 +354,7 @@ Future<void> _onDismiss(BuildContext context, WidgetRef ref) async {
 
 | Senaryo | Davranış |
 |---|---|
-| `earned == 0` (tam 60s boundary veya capped=0) | B1 pattern: HomePage SnackBar fallback (welcomeBack l10n) — modal açılmaz. Gate: `if (report != null && report.earned > 0)`. |
+| `earned == 0` veya `earned.toInt() == 0` (tam 60s boundary veya capped=0 veya 0 < earned < 1) | Modal açılmaz, SnackBar da yok — sessiz geçiş. Telemetry emit edilmez (kullanıcı hiçbir şey yapmadı gözlemi). Gate kodda **explicit**: `if (report != null && report.earned.toInt() > 0)` — double `earned > 0` ile integer floor `.toInt() > 0` tutarsız olmasın. 0 < earned < 1 edge'i int floor ile elenir. |
 | `capped == true` | Modal "8 saat sınırına ulaşıldı" badge gösterir. Earned clamp yansıtılmış. |
 | Pre-hydrate Home mount (boot race) | initState postFrame henüz `offlineReportProvider` null; listen kurulmuş. Hydrate sonrası provider set → listen `prev=null, next=report` → push. OK. |
 | Reduce motion ON | TweenAnimationBuilder Duration.zero → counter instant final value. showGeneralDialog transitionDuration.zero → modal pop instant. Content identical. |
@@ -376,7 +387,7 @@ Mevcut HomePage `ref.listen(offlineReportProvider)` SnackBar koduyla replace edi
 ### 4.2 Kritik test senaryoları
 
 - **Telemetry schema:** 3 event — `eventName` Firebase regex (`^[a-zA-Z][a-zA-Z0-9_]{0,39}$`) + no reserved prefix (`firebase_`, `google_`, `ga_`)
-- **Modal render:** `TweenAnimationBuilder` mount → `pump(const Duration(seconds: 2))` → final value displayed
+- **Modal render:** `TweenAnimationBuilder` mount → `pump(const Duration(milliseconds: 1600))` (1.5s animation + buffer) → final value displayed. `pumpAndSettle` tercih edilmez — 1.5s frame-by-frame bekleme test slow + tick timer interference; explicit duration pump kontrollü.
 - **Low-motion:** `MediaQuery.disableAnimations=true` → counter Text shows final value on first pump
 - **Collect CTA:** tap FilledButton → SessionRecapActionTaken(`action_type: 'collect'`) emitted + `offlineReportProvider` cleared + modal popped
 - **Dismiss X CTA:** tap close icon → SessionRecapDismissed + clear + pop
@@ -476,11 +487,11 @@ Mevcut HomePage `ref.listen(offlineReportProvider)` SnackBar koduyla replace edi
 | non-Home cold-start (Settings deep-link) hydrate race | Düşük | Düşük | HomePage mount'ta `ref.read(offlineReportProvider)` hydrate tamamlandığı için already-set value yakalar |
 | Multiplier provider mevcut değil (Sprint A/B1) | Düşük | Orta | Plan task T1: `multiplierChainTotalProvider` varlık doğrulaması; yoksa basit compute `ref.watch(gameStateProvider).value.multiplier` fallback |
 | i18n regression (welcomeBack vs sessionRecap*) | Düşük | Düşük | Mevcut welcomeBack key preserved (deprecate yok) + 6 yeni key ayrı namespace |
-| Test flake — `addPostFrameCallback` timing | Düşük | Düşük | `tester.pumpAndSettle` post-mount standart pattern |
+| Test flake — `addPostFrameCallback` timing | Düşük | Düşük | `pump(Duration.zero)` postFrame fire + explicit `pump(Duration(ms: 1600))` animation complete — `pumpAndSettle` tick timer interference nedeniyle kullanılmaz |
 
 ### 5.5 Dependencies
 
-- `multiplierChainTotalProvider` — mevcut olduğu varsayılır (B1 multiplier chain); yoksa plan T1 smoke check.
+- `multiplierChainTotalProvider` — B1 codebase varlığı plan T1'de **kesin karar**: grep + file read ile doğrula; mevcut değilse T1'e yeni provider create task step'i (derived: `Provider<double>((ref) { final gs = ref.watch(gameStateNotifierProvider).valueOrNull; if (gs == null) return 1.0; return MultiplierChain.computeTotal(gs); })`). Smoke check değil — yoksa eklenir.
 - `offlineReportProvider` — B1'de tamamlandı, reuse.
 - `sessionControllerProvider.currentSessionId` — B3 pattern, telemetry event enrich için.
 - `telemetryLoggerProvider` — B3.
@@ -502,7 +513,7 @@ Mevcut HomePage `ref.listen(offlineReportProvider)` SnackBar koduyla replace edi
 10. [I26] one-shot + [I25] Crumbs integrity widget tests
 11. Integration test: cold-start → modal → Collect → next session clean
 12. CLAUDE.md §5/§12/§13 updates + docs/telemetry.md §4.7 schema güncel
-13. Coverage check + manuel QA checklist update (docs/audio-plan.md pattern paralel, yeni file session-recap-qa.md değil — CLAUDE.md §4 ek list)
+13. Coverage check + CLAUDE.md §4 ek list "session recap manuel QA 7 item" tek satır inline (yeni `docs/session-recap-qa.md` YARATMA — B6 scope audio-plan.md'den dar, doc overhead gereksiz)
 14. Git housekeeping (stub file cleanup, `welcomeBack` usage audit)
 
 ---
