@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:crumbs/core/audio/audio_engine.dart';
+import 'package:crumbs/core/audio/sfx_catalog.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/core/state/providers.dart';
 import 'package:crumbs/l10n/app_strings.dart';
@@ -27,7 +31,11 @@ class _BuildingRowState extends ConsumerState<BuildingRow> {
     final success = await ref
         .read(gameStateNotifierProvider.notifier)
         .buyBuilding(widget.id);
-    if (!success && mounted) {
+    if (success) {
+      unawaited(
+        ref.read(audioControllerProvider).playCue(SfxCue.purchaseSuccess),
+      );
+    } else if (mounted) {
       setState(() => _shakeSeq++);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

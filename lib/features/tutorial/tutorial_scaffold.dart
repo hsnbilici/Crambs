@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:crumbs/core/audio/audio_engine.dart';
+import 'package:crumbs/core/audio/sfx_catalog.dart';
 import 'package:crumbs/core/save/game_state.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/core/telemetry/telemetry_providers.dart';
@@ -70,11 +74,17 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
       final nextCrumbs = next.value?.inventory.r1Crumbs ?? 0;
       if (step == TutorialStep.tapHero && nextCrumbs > prevCrumbs) {
         ref.read(tutorialNotifierProvider.notifier).advance(from: step);
+        unawaited(
+          ref.read(audioControllerProvider).playCue(SfxCue.stepComplete),
+        );
       }
       final prevOwned = prev?.value?.buildings.owned['crumb_collector'] ?? 0;
       final nextOwned = next.value?.buildings.owned['crumb_collector'] ?? 0;
       if (step == TutorialStep.openShop && nextOwned > prevOwned) {
         ref.read(tutorialNotifierProvider.notifier).advance(from: step);
+        unawaited(
+          ref.read(audioControllerProvider).playCue(SfxCue.stepComplete),
+        );
       }
     });
 
@@ -127,6 +137,9 @@ class _TutorialScaffoldState extends ConsumerState<TutorialScaffold> {
   }
 
   Future<void> _onCompletePressed(TutorialNotifier notifier) async {
+    unawaited(
+      ref.read(audioControllerProvider).playCue(SfxCue.stepComplete),
+    );
     await notifier.complete();
     _emitCompleted(skipped: false);
   }

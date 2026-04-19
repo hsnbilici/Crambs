@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:crumbs/core/audio/audio_engine.dart';
+import 'package:crumbs/core/audio/sfx_catalog.dart';
 import 'package:crumbs/core/economy/upgrade_defs.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/core/state/providers.dart';
@@ -33,7 +37,11 @@ class _UpgradeRowState extends ConsumerState<UpgradeRow> {
     final success = await ref
         .read(gameStateNotifierProvider.notifier)
         .buyUpgrade(widget.id);
-    if (!success && mounted) {
+    if (success) {
+      unawaited(
+        ref.read(audioControllerProvider).playCue(SfxCue.upgradeBuy),
+      );
+    } else if (mounted) {
       setState(() => _shakeSeq++);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
