@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:crumbs/core/audio/audio_engine.dart';
+import 'package:crumbs/core/audio/sfx_catalog.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/features/home/providers.dart';
 import 'package:flutter/material.dart';
@@ -14,8 +18,15 @@ class _TapAreaState extends ConsumerState<TapArea> {
   double _scale = 1;
 
   void _onTap() {
-    ref.read(gameStateNotifierProvider.notifier).tapCrumb();
+    final didFire =
+        ref.read(gameStateNotifierProvider.notifier).tapCrumb();
     ref.read(floatingNumbersProvider.notifier).spawn(1);
+    if (didFire) {
+      // [I22] — SFX shares the haptic throttle gate; no stacking.
+      // Fire-and-forget — UI latency preserved; engine errors are logged
+      // internally (AudioplayersEngine._blocked fail-silent, I21).
+      unawaited(ref.read(audioControllerProvider).playCue(SfxCue.tap));
+    }
   }
 
   @override

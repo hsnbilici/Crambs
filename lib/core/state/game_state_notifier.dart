@@ -122,13 +122,16 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     if (seconds > 0) applyProductionDelta(seconds);
   }
 
-  void tapCrumb() {
+  /// Returns `true` if the throttled feedback gate fired this tap
+  /// (haptic + SFX in widget layer), `false` if suppressed. Callers that
+  /// don't care about feedback may ignore the return.
+  bool tapCrumb() {
     final gs = state.value;
-    if (gs == null) return;
+    if (gs == null) return false;
     state = AsyncData(gs.copyWith(
       inventory: gs.inventory.copyWith(r1Crumbs: gs.inventory.r1Crumbs + 1),
     ));
-    _triggerHaptic();
+    final didFire = _triggerHaptic();
     // Onboarding hint pass-through dismiss — fire-and-forget.
     // Swallow late-dispose errors (container may dispose during the async gap
     // of SharedPreferences.getInstance in dismissHint).
@@ -141,6 +144,7 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
             .catchError((Object _) {}),
       );
     }
+    return didFire;
   }
 
   Future<bool> buyBuilding(String id) async {
@@ -294,14 +298,15 @@ class GameStateNotifier extends AsyncNotifier<GameState> {
     );
   }
 
-  void _triggerHaptic() {
+  bool _triggerHaptic() {
     final now = DateTime.now();
     if (_lastHaptic != null &&
         now.difference(_lastHaptic!).inMilliseconds < 80) {
-      return;
+      return false;
     }
     _lastHaptic = now;
     unawaited(HapticFeedback.lightImpact());
+    return true;
   }
 }
 
