@@ -156,6 +156,9 @@ void main() {
       TutorialCompleted() => 'tut_done',
       PurchaseMade() => 'purchase',
       UpgradePurchased() => 'upgrade',
+      SessionRecapShown() => 'recap_shown',
+      SessionRecapActionTaken() => 'recap_action',
+      SessionRecapDismissed() => 'recap_dismissed',
     };
     expect(name, 'install');
   });
