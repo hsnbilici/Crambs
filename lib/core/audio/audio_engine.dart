@@ -1,8 +1,12 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:crumbs/core/audio/audio_controller.dart';
+import 'package:crumbs/core/audio/audio_settings.dart';
+import 'package:crumbs/core/audio/audio_settings_notifier.dart';
 import 'package:crumbs/core/audio/sfx_catalog.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Audio primitive layer — wraps `audioplayers` (concrete impl added in
 /// AudioplayersEngine). Tests use FakeAudioEngine.
@@ -284,3 +288,31 @@ class AudioplayersEngine implements AudioEngine {
     }
   }
 }
+
+// ---- Providers ----
+
+/// Singleton audio engine — app lifetime. Explicit dispose on ref teardown.
+final audioEngineProvider = Provider<AudioEngine>((ref) {
+  final engine = AudioplayersEngine();
+  ref.onDispose(() {
+    // Fire-and-forget dispose; ref lifecycle is sync teardown path.
+    unawaited(engine.dispose());
+  });
+  return engine;
+});
+
+/// Controller = engine + settings snapshot.
+/// Pattern A (spec §1): plain AudioController instantiated in provider;
+/// settings diff delivered via ref.listen — listen cleanup is automatic
+/// when provider container disposes.
+final audioControllerProvider = Provider<AudioController>((ref) {
+  final engine = ref.watch(audioEngineProvider);
+  final initial = ref.read(audioSettingsProvider).value ??
+      const AudioSettings.defaults();
+  final ctrl = AudioController(engine, initial);
+  ref.listen<AsyncValue<AudioSettings>>(audioSettingsProvider, (prev, next) {
+    final n = next.value;
+    if (n != null) unawaited(ctrl.updateSettings(n));
+  });
+  return ctrl;
+});
