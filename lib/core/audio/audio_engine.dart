@@ -1,3 +1,9 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
+import 'package:crumbs/core/audio/sfx_catalog.dart';
+import 'package:flutter/foundation.dart';
+
 /// Audio primitive layer — wraps `audioplayers` (concrete impl added in
 /// AudioplayersEngine). Tests use FakeAudioEngine.
 ///
@@ -108,5 +114,173 @@ class FakeAudioEngine implements AudioEngine {
   Future<void> dispose() async {
     disposed = true;
     loopRunning = false;
+  }
+}
+
+/// Concrete platform-bound engine — coverage excluded per spec §4.4.
+///
+/// Wraps `audioplayers`:
+/// - per-cue [AudioPool] (4 players max) for rapid overlap SFX
+/// - single ambient [AudioPlayer] loop
+/// - iOS Ambient category (silenced by Ring/Silent switch, mix with others)
+/// - Android media/music content type (respects silent mode per platform)
+///
+/// Race-guard contract:
+/// - [init] is idempotent; repeated calls reuse the same [_initCompleter].
+/// - On bootstrap failure, completer still completes (NOT completeError) so
+///   awaiters unblock and proceed to silent no-ops via [_failed].
+/// - Every public method (except [dispose]) awaits [_initCompleter] before
+///   touching platform state — pre-init plays queue safely.
+class AudioplayersEngine implements AudioEngine {
+  Completer<void>? _initCompleter;
+  bool _failed = false;
+  bool _disposed = false;
+
+  final Map<SfxCue, AudioPool> _pools = {};
+  final AudioPlayer _ambient = AudioPlayer();
+
+  bool get _blocked => _failed || _disposed;
+
+  @override
+  Future<void> init() {
+    final existing = _initCompleter;
+    if (existing != null) return existing.future;
+    final completer = Completer<void>();
+    _initCompleter = completer;
+    unawaited(
+      _bootstrap().then(
+        (_) {
+          completer.complete();
+        },
+        onError: (Object e, StackTrace st) {
+          _failed = true;
+          debugPrint('AudioplayersEngine init failed: $e\n$st');
+          completer.complete();
+        },
+      ),
+    );
+    return completer.future;
+  }
+
+  Future<void> _bootstrap() async {
+    // iOS Ambient — silenced by Ring/Silent switch + mix with other audio.
+    // Android default: media content + music usage (platform convention;
+    // silent mode behaviour handled by OS).
+    // NOTE: `AudioContext`/`AudioContextIOS` constructors are non-const
+    // (AudioContextIOS has runtime asserts), so we cannot use `const` here.
+    await AudioPlayer.global.setAudioContext(
+      AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.ambient,
+          options: const {AVAudioSessionOptions.mixWithOthers},
+        ),
+        android: const AudioContextAndroid(
+          // contentType/usageType defaults match (music/media).
+          audioFocus: AndroidAudioFocus.none,
+        ),
+      ),
+    );
+    // Parallel AudioPool warm — one per cue.
+    await Future.wait([
+      for (final cue in SfxCue.values)
+        AudioPool.create(
+          source: AssetSource(SfxCatalog.assetPath(cue)),
+          maxPlayers: 4,
+        ).then((pool) => _pools[cue] = pool),
+    ]);
+    await _ambient.setReleaseMode(ReleaseMode.loop);
+  }
+
+  SfxCue? _cueForPath(String assetPath) {
+    for (final cue in SfxCue.values) {
+      if (SfxCatalog.assetPath(cue) == assetPath) return cue;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> playOneShot(String assetPath, {required double volume}) async {
+    await _initCompleter?.future;
+    if (_blocked) return;
+    final cue = _cueForPath(assetPath);
+    final pool = cue != null ? _pools[cue] : null;
+    if (pool == null) return;
+    try {
+      await pool.start(volume: volume);
+    } on Object catch (e, st) {
+      debugPrint('playOneShot failed ($assetPath): $e\n$st');
+    }
+  }
+
+  @override
+  Future<void> startLoop(String assetPath, {required double volume}) async {
+    await _initCompleter?.future;
+    if (_blocked) return;
+    try {
+      await _ambient.stop();
+      await _ambient.setVolume(volume);
+      await _ambient.play(AssetSource(assetPath));
+    } on Object catch (e, st) {
+      debugPrint('startLoop failed ($assetPath): $e\n$st');
+    }
+  }
+
+  @override
+  Future<void> stopLoop() async {
+    await _initCompleter?.future;
+    if (_blocked) return;
+    try {
+      await _ambient.stop();
+    } on Object catch (e, st) {
+      debugPrint('stopLoop failed: $e\n$st');
+    }
+  }
+
+  @override
+  Future<void> pauseLoop() async {
+    await _initCompleter?.future;
+    if (_blocked) return;
+    try {
+      await _ambient.pause();
+    } on Object catch (e, st) {
+      debugPrint('pauseLoop failed: $e\n$st');
+    }
+  }
+
+  @override
+  Future<void> resumeLoop() async {
+    await _initCompleter?.future;
+    if (_blocked) return;
+    try {
+      await _ambient.resume();
+    } on Object catch (e, st) {
+      debugPrint('resumeLoop failed: $e\n$st');
+    }
+  }
+
+  @override
+  Future<void> setLoopVolume(double v) async {
+    await _initCompleter?.future;
+    if (_blocked) return;
+    try {
+      await _ambient.setVolume(v);
+    } on Object catch (e, st) {
+      debugPrint('setLoopVolume failed: $e\n$st');
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    try {
+      await _ambient.dispose();
+      for (final pool in _pools.values) {
+        await pool.dispose();
+      }
+      _pools.clear();
+    } on Object catch (e, st) {
+      debugPrint('AudioplayersEngine dispose failed: $e\n$st');
+    }
   }
 }
