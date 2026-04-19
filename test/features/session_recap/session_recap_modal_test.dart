@@ -210,6 +210,65 @@ void main() {
       expect(logger.events, isEmpty);
     });
   });
+
+  group('[I25] Crumbs ledger CTA-independent', () {
+    testWidgets('Collect vs Dismiss → both clear provider, no Crumbs mutation',
+        (tester) async {
+      const report = OfflineReport(
+        earned: 100,
+        elapsed: Duration(minutes: 10),
+        capped: false,
+      );
+
+      // Scenario A: Collect
+      final loggerA = _RecordingLogger();
+      final containerA = ProviderContainer(overrides: [
+        telemetryLoggerProvider.overrideWithValue(loggerA),
+      ]);
+      addTearDown(containerA.dispose);
+      containerA.read(offlineReportProvider.notifier).state = report;
+
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: containerA,
+        child: const MaterialApp(
+          localizationsDelegates: AppStrings.localizationsDelegates,
+          supportedLocales: AppStrings.supportedLocales,
+          home: Scaffold(body: SessionRecapModal(report: report)),
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 1600));
+      await tester.tap(find.text('Topla'));
+      await tester.pump();
+      expect(containerA.read(offlineReportProvider), isNull);
+      expect(loggerA.events.first, isA<SessionRecapActionTaken>());
+
+      // Reset widget tree between scenarios — scenario A's Navigator.pop()
+      // pops the root route, so the next pumpWidget needs a clean slate.
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      // Scenario B: Dismiss
+      final loggerB = _RecordingLogger();
+      final containerB = ProviderContainer(overrides: [
+        telemetryLoggerProvider.overrideWithValue(loggerB),
+      ]);
+      addTearDown(containerB.dispose);
+      containerB.read(offlineReportProvider.notifier).state = report;
+
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: containerB,
+        child: const MaterialApp(
+          localizationsDelegates: AppStrings.localizationsDelegates,
+          supportedLocales: AppStrings.supportedLocales,
+          home: Scaffold(body: SessionRecapModal(report: report)),
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 1600));
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pump();
+      expect(containerB.read(offlineReportProvider), isNull);
+      expect(loggerB.events.first, isA<SessionRecapDismissed>());
+    });
+  });
 }
 
 class _RecordingLogger implements TelemetryLogger {
