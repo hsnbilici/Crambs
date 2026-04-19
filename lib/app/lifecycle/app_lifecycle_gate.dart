@@ -72,11 +72,12 @@ class _AppLifecycleGateState extends ConsumerState<AppLifecycleGate> {
     ref.read(gameStateNotifierProvider.notifier)
       ..applyResumeDelta()
       ..resetTickClock();
-    try {
-      unawaited(ref.read(audioControllerProvider).resumeAmbient());
-    } on Object catch (e, st) {
-      debugPrint('audio resumeAmbient failed in _onResume: $e\n$st');
-    }
+    unawaited(
+      ref.read(audioControllerProvider).resumeAmbient().catchError(
+        (Object e, StackTrace st) =>
+            debugPrint('audio resumeAmbient failed in _onResume: $e\n$st'),
+      ),
+    );
   }
 
   @override
