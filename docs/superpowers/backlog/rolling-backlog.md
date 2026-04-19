@@ -43,7 +43,6 @@
 ## 2. B5 post-merge polish (final reviewer)
 
 ### Minor — post-merge
-- [ ] **Bootstrap race guard** — `lib/main.dart`'ta `await audioSettingsProvider.future` ekle, `audioControllerProvider` read'i öncesi. Mevcut `<100ms` race penceresinde kullanıcı persisted `sfxEnabled: false` varken default `true` SFX çalabilir.
 - [ ] **Audio asset Git LFS migration** — mevcut ~135KB inline OK; industrial+galactic ambient (~900KB each) eklenirse 3MB threshold aşılır. `git lfs track "*.ogg"` migration. `_dev/tasks/post-b5-audio-asset-curation.md` Sprint D ile senkron.
 
 ---
