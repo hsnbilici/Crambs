@@ -6,6 +6,7 @@ import 'package:crumbs/app/error/error_screen.dart';
 import 'package:crumbs/app/lifecycle/app_lifecycle_gate.dart';
 import 'package:crumbs/app/routing/app_router.dart';
 import 'package:crumbs/core/audio/audio_engine.dart';
+import 'package:crumbs/core/audio/audio_settings_notifier.dart';
 import 'package:crumbs/core/preferences/onboarding_prefs.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/features/tutorial/tutorial_scaffold.dart';
@@ -21,6 +22,13 @@ Future<void> main() async {
   await boot.container
       .read(onboardingPrefsProvider.notifier)
       .ensureLoaded();
+
+  // B5 — await audio settings hydrate BEFORE runApp. Otherwise
+  // audioControllerProvider's first read falls back to AudioSettings.defaults()
+  // (sfxEnabled=true) while disk may have sfxEnabled=false persisted;
+  // <100ms pre-hydrate tap would play SFX the user disabled.
+  // Prefs I/O cost ~10-50ms; acceptable cold-start addition.
+  await boot.container.read(audioSettingsProvider.future);
 
   // B5 — audio engine lazy init (fire-and-forget).
   // Cold start uncoupled from platform audio config (200-500ms).
