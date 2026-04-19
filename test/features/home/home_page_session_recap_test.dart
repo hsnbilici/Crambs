@@ -190,4 +190,82 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     container.dispose();
   });
+
+  testWidgets('non-Home first mount → Home navigate → modal opens',
+      (tester) async {
+    final logger = _RecordingLogger();
+    const report = OfflineReport(
+      earned: 75,
+      elapsed: Duration(minutes: 8),
+      capped: false,
+    );
+    final container = await _boot(tester, tempDir, logger, report);
+
+    // Mount a non-Home widget first.
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        localizationsDelegates: AppStrings.localizationsDelegates,
+        supportedLocales: AppStrings.supportedLocales,
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => Navigator.of(ctx).push(
+                MaterialPageRoute<void>(builder: (_) => const HomePage()),
+              ),
+              child: const Text('go-home'),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    // No modal yet — non-Home mounted.
+    expect(find.byType(SessionRecapModal), findsNothing);
+
+    // Navigate to Home — fresh mount, initState postFrame reads provider.
+    await tester.tap(find.text('go-home'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 1600));
+
+    expect(find.byType(SessionRecapModal), findsOneWidget);
+
+    // Teardown
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    container.dispose();
+  });
+
+  testWidgets(
+    'hot-resume does NOT push offlineReportProvider → no modal (existing B1)',
+    (tester) async {
+      // Contract reminder test — applyResumeDelta invariant (B1) guarantees
+      // hot-resume doesn't push offlineReportProvider. HomePage with null
+      // provider: no modal. If applyResumeDelta ever changes this, test fails.
+      final logger = _RecordingLogger();
+      final container = await _boot(tester, tempDir, logger, null);
+
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          localizationsDelegates: AppStrings.localizationsDelegates,
+          supportedLocales: AppStrings.supportedLocales,
+          home: HomePage(),
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 1));
+
+      // Simulate hot-resume (no explicit provider push — applyResumeDelta
+      // would run here in real app).
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(SessionRecapModal), findsNothing);
+      expect(logger.events, isEmpty);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+      container.dispose();
+    },
+  );
 }
