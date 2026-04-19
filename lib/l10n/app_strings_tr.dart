@@ -148,7 +148,7 @@ class AppStringsTr extends AppStrings {
   String get settingsAudioSfxToggle => 'Efektler';
 
   @override
-  String get settingsAudioStubHint => 'Yakında aktif olacak';
+  String get settingsAudioMasterVolume => 'Genel Ses';
 
   @override
   String get settingsDevSection => 'Geliştirici';
