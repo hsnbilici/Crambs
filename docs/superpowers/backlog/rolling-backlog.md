@@ -23,6 +23,15 @@
 ## 1. Sprint C+ kapsamına ertelenmişler
 
 ### Content + feature
+- **Session Recap Modal implementation** — MVP §6.9 gap (PRD "Kritik MVP"). Docs spec hazır: `docs/ux-flows.md §6.1-6.3` (trigger `lastActiveAt > 60s` Home-post-load, 8-step flow, 3 CTA, ≤1.5s animation, a11y focus+reduced-motion). Kod `lib/features/session_recap/session_recap_modal.dart` 18-satır stub (TODO). **Sprint B6 adayı** — yeni brainstorm + plan + subagent-driven sprint:
+  - Trigger wiring (`GameStateNotifier` cold-start hydrate + Home post-mount one-shot gate)
+  - Offline delta hesaplama (mevcut `OfflineReport` yeniden kullanılabilir mi incele)
+  - 3 yeni telemetry event (`session_recap_shown` / `_action_taken` / `_dismissed` — `docs/telemetry.md §4.7`)
+  - Modal UI (8 content section + animated counter Hero motion §9)
+  - 3 CTA kontratı (Collect / Take Action / Dismiss) + deep-link to shop/upgrade
+  - A11y (focus mgmt, reduced-motion, 44×44 tap)
+  - Unit + widget + integration test
+  - Tahmin: 10-14 task, ~1 hafta
 - **ResearchComplete telemetry event** — research impl'yle birlikte (Sprint C R2 Research tree).
 - **Dönem-spesifik ambient müzik** — industrial + galactic loops (Sprint D prestige polish). B5'te tek artisan loop.
 - **Cue-per-step tutorial SFX** — post-MVP backlog. B5'te tek `stepComplete` cue.
@@ -55,10 +64,8 @@
 - [ ] **B5 plan drift** — T6 plan `const AudioContext(...)` var; gerçek non-const (audioplayers 6.6.0 nested constructor'lar). Plan snippet update.
 - [ ] **B5 plan drift** — T8 `overrideWithValue` (Riverpod 3'te builder skip'ler, `ref.onDispose` register olmaz). Gerçek testler `overrideWith((ref) { ref.onDispose(...); return fake; })`. Plan snippet güncelle.
 
-### `ux-flows.md §6` cross-ref fix
-- [ ] **Session Recap §6 kaybı** (B2 T17 regression) — `docs/ux-flows.md:82, 509, 528` hâlâ `§6`'ya işaret ediyor ama Tutorial'la replace edilmiş. Opsiyonlar:
-  1. `git show main:docs/ux-flows.md`'den Session Recap §6 restore + Tutorial `§8` olarak renumber
-  2. 3 cross-ref'i yeni konuma güncelle
+### ~~`ux-flows.md §6` cross-ref fix~~ ✅ RESOLVED
+- ~~Session Recap §6 kaybı (B2 T17 regression)~~ — B2 commit `7e8c372` (`fix(bug_011)`) ile restore edildi. `docs/ux-flows.md §6 Session Recap Modal — Detaylı Akış` 6.1/6.2/6.3 alt-bölümleriyle tam. Cross-ref'ler doğru. **Stale item**, temizlendi.
 
 ---
 
@@ -129,12 +136,15 @@ B5 polish commit `0614963` ile 7 yeni ders eklendi (asset wildcard CRITICAL + 6 
 - Flutter asset bundling lesson yüksek öncelik (critical recurrence riski)
 
 **Orta (Sprint C-D):**
+- **Session Recap Modal implementation** (MVP §6.9 — Sprint B6 adayı, yeni brainstorm+plan gerekir)
 - B3 spec/plan docs drift
 - B5 plan drift (T6/T8/T12 snippet updates)
 - Test harness shared helpers (audio overrides)
-- Session Recap §6 cross-ref restore
-- Bootstrap race guard
 - Class modifier upgrades
+
+**Tamamlanan (stale):**
+- ~~Session Recap §6 cross-ref restore~~ — B2 `7e8c372` ile fix edildi
+- ~~Bootstrap race guard~~ — B5 polish PR #9 ile fix edildi (`8cc1e7d`)
 
 **Düşük (post-MVP, opsiyonel):**
 - Magic number cleanups
