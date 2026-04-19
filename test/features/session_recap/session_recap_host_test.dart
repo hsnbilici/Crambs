@@ -99,4 +99,21 @@ void main() {
 
     expect(logger.events, isEmpty);
   });
+
+  testWidgets('clear() called twice → no-op', (tester) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(offlineReportProvider.notifier).state =
+        const OfflineReport(
+      earned: 50,
+      elapsed: Duration(minutes: 5),
+      capped: false,
+    );
+    container.read(offlineReportProvider.notifier).clear();
+    expect(container.read(offlineReportProvider), isNull);
+
+    container.read(offlineReportProvider.notifier).clear();
+    expect(container.read(offlineReportProvider), isNull);
+  });
 }
