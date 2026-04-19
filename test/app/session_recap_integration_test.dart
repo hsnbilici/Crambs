@@ -4,7 +4,6 @@ import 'package:crumbs/core/audio/audio_engine.dart';
 import 'package:crumbs/core/feedback/offline_report.dart';
 import 'package:crumbs/core/save/save_repository.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
-import 'package:crumbs/core/telemetry/telemetry_event.dart';
 import 'package:crumbs/core/telemetry/telemetry_providers.dart';
 import 'package:crumbs/features/home/home_page.dart';
 import 'package:crumbs/features/session_recap/session_recap_modal.dart';
@@ -73,9 +72,8 @@ void main() {
 
     // Modal shown
     expect(find.byType(SessionRecapModal), findsOneWidget);
-    expect(logger.events.where((e) => e is SessionRecapShown), hasLength(1));
-    final shown = logger.events
-        .firstWhere((e) => e is SessionRecapShown) as SessionRecapShown;
+    expect(logger.events.whereType<SessionRecapShown>(), hasLength(1));
+    final shown = logger.events.whereType<SessionRecapShown>().first;
     expect(shown.resourceEarnedOffline, 250);
     expect(shown.offlineDurationMs,
         const Duration(minutes: 45).inMilliseconds);
@@ -88,8 +86,8 @@ void main() {
     // Modal gone, provider cleared
     expect(find.byType(SessionRecapModal), findsNothing);
     expect(container.read(offlineReportProvider), isNull);
-    expect(logger.events.where((e) => e is SessionRecapActionTaken),
-        hasLength(1));
+    expect(
+        logger.events.whereType<SessionRecapActionTaken>(), hasLength(1));
 
     // Simulate next session — provider stays null, no modal
     await tester.pumpWidget(const SizedBox.shrink());
