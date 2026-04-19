@@ -142,3 +142,105 @@ Benzer pattern Android için: `android/app/build.gradle.kts` `minSdk` — fireba
 4. Native SDK boot validation exception'ları Dart catch edemez — Info.plist requirement'ı zorunlu-at-commit-time
 
 **Meta-ders:** "Pubspec'e dep ekle → hiç kullanma → saklı boot crash" pattern'i tehlikeli. Dependency eklerken o dep'in boot-time requirement'larını immediate execute et (Info.plist entry, native SDK init), değilse dep'i ekleme. B1 scaffold decision'ı retroactively temizlenmeli: ya google_mobile_ads/in_app_purchase Info.plist + AndroidManifest entry'leri tam setup, ya B6+'ya kadar pubspec'ten kaldır.
+
+## Sprint B5 dersleri (2026-04-19)
+
+### Ders: Flutter pubspec `assets:` NON-recursive — subdirectory'ler tek tek listelenir
+**Problem:** B5 sprint'te 4 SFX + 1 ambient `.ogg` asset'ini `assets/audio/sfx/` ve `assets/audio/music/` altına koyduk. `pubspec.yaml` içinde mevcut `assets: - assets/` entry'si varsayım olarak "wildcard / recursive" kabul edildi; plan doc'una bile (`2026-04-19-sprint-b5-audio-layer.md` line 98) "yeni directory declaration gerekmez" yazıldı. 297 automated test yeşil, PR final review'a kadar bug silent kaldı. Final reviewer gerçek APK build yapıp `unzip -l build/.../app-debug.apk | grep ogg` ile kontrol edince **AssetManifest.bin içinde YALNIZ `assets/.gitkeep`** olduğunu, beş .ogg dosyasının bundle edilmediğini keşfetti. [I21] fail-silent sayesinde runtime'da crash yok — sadece sessiz oyun. T14-fix commit `f953861` ile 1-satır pubspec eklemesiyle çözüldü.
+
+**Kök neden:** Flutter `pubspec.yaml` `flutter.assets:` declaration'ı — `- assets/` formatı **yalnız o dizinin direct children'ını** bundle eder, subdirectory'leri kapsamaz. Documented Flutter behavior ama counter-intuitive (diğer build system'lerde wildcard default). Plan yazım sırasında assumption doğrulanmadı, implementer spec'e bire bir uydu.
+
+**Kritik tespit — neden otomatik test yakalamadı:**
+- Tüm audio tests `FakeAudioEngine` override kullanır → gerçek asset resolve hiç çalışmaz
+- `AudioplayersEngine` production path platform-bound, coverage dışında (spec §4.4)
+- `flutter analyze` / `flutter test` asset bundling path'ini hiç expose etmez
+- CI'da `flutter build apk --debug` yapılmıyor (test + coverage only); ancak real device deploy'da fark edilir
+
+**Önleme kuralı:**
+1. Yeni asset directory ekleyince **her zaman** pubspec'e explicit entry at:
+   ```yaml
+   assets:
+     - assets/
+     - assets/audio/sfx/      # her subdirectory ayrı satır
+     - assets/audio/music/
+   ```
+2. Asset eklerken doğrulama: `flutter build apk --debug && unzip -l build/app/outputs/flutter-apk/app-debug.apk | grep <ext>` — beklenen dosya sayısı listede mi?
+3. CI pipeline'a APK build + asset manifest assertion ekle (Sprint D polish candidate)
+4. `FakeAudioEngine` gibi test-only substitute'ler runtime asset path'ini validate etmez; platform-bound integration veya manuel QA zorunlu
+
+**Meta-ders:** "Test yeşil + analyze clean + review geçti" yeterli değil — build artifact inspection kritik. Fail-silent invariant'lar ([I21] gibi) bug maskeleyebilir; bu durum tests'i invalidate etmez ama test scope'u build/asset tarafını kapsamalı. CLAUDE.md §4 zorunlu docs yeterli değil, §10 "plan mode" listesinde "asset pipeline değişikliği" kategorisi değerlendirilebilir.
+
+### Ders: Riverpod 3 `overrideWithValue` builder'ı skip eder — `ref.onDispose` register olmaz
+**Problem:** B5 T8'de `audioEngineProvider` test'inde `audioEngineProvider.overrideWithValue(fake)` kullanıldı. Test assertion "container.dispose → fake.disposed=true" — always false. Provider builder içindeki `ref.onDispose(() => engine.dispose())` hiç register olmadı.
+
+**Kök neden:** Riverpod 3'te `overrideWithValue(v)` internal olarak `$SyncValueProvider<T>(v)` substitute eder — orijinal provider builder closure **hiç çalışmaz**. `ref.watch`, `ref.read`, `ref.listen`, `ref.onDispose` gibi Ref API'leri override builder'ı atlanarak direkt value injection yapar.
+
+**Önleme kuralı:**
+- Provider dispose side-effect'i veya ref.listen/onDispose teste dahilse: `overrideWithValue` yerine `overrideWith` kullan:
+  ```dart
+  audioEngineProvider.overrideWith((ref) {
+    ref.onDispose(() => unawaited(fake.dispose()));
+    return fake;
+  })
+  ```
+- Yalnız value injection gerekliyse (side-effect yok) `overrideWithValue` hâlâ doğru seçim — daha sade.
+- Test-reviewer sorgusu: "Override builder'ı çalışmasa da assertion geçer mi?" Evet ise assertion zayıf, overrideWith'e geçir.
+
+### Ders: flutter_animate `.shake()` widget test'te `Timer(Duration.zero)` leak eder
+**Problem:** B5 T11 sonrası `building_row_sfx_test` (widget test) `!timersPending` invariant assertion ile fail. Pending timer stack: `_AnimateState._restart → FakeTimer duration 0`. BuildingRow `.animate().shake(duration: 300.ms, hz: 6)` wrap'inden geliyor.
+
+**Kök neden:** `flutter_animate` initState'te `Timer(Duration.zero)` spawn ediyor animasyon scheduling için. Widget test fake-async zone'unda bu timer pump(0) olmadan fire etmiyor; test bitişinde `_verifyInvariants` pending görünce hata veriyor.
+
+**Önleme kuralı:**
+- `flutter_animate .shake() / .fade() / .scale()` kullanan widget mount edildikten sonra `tester.pump(Duration(milliseconds: 1))` ile Duration.zero timer'larını drain et.
+- Test sonunda unmount + dispose drain sırası: `pump(Duration(seconds: 3))` (snackbar + shake settle) → `pumpWidget(SizedBox.shrink())` → `pump(1ms)` → `container.dispose()`.
+- Shared `_teardown(tester, container)` helper tekrar eden boilerplate'i azaltır (bkz `building_row_sfx_test.dart`).
+
+### Ders: GameStateNotifier lifecycle test — hydrate hiç tetiklenmezse `persistNow()` silent skip eder
+**Problem:** B5 T9-polish `[I23]` triple-order test'inde `persist.save` log'a eklenmedi. SessionController ve AudioController kanıtlı çalışıyordu ama SaveRepository.save hiç çağrılmadı.
+
+**Kök neden:** `GameStateNotifier.persistNow()` → `if (state.value == null) return;` early return. Widget test'te `ProviderScope(overrides: ...)` ile mount → `gameStateNotifierProvider` lazy, AsyncLoading state kalır. `pumpAndSettle` path_provider I/O'yu (fake-async zone'unda) beklemez. Lifecycle pause hit ettiğinde state hâlâ null → persist skip.
+
+**Önleme kuralı:**
+- Widget test'te GameStateNotifier kullanan lifecycle path'i test ediyorsan pre-boot pattern zorunlu:
+  ```dart
+  late ProviderContainer container;
+  await tester.runAsync(() async {
+    container = ProviderContainer(overrides: [...]);
+    await container.read(gameStateNotifierProvider.future); // hydrate
+  });
+  await tester.pumpWidget(UncontrolledProviderScope(container: ..., child: ...));
+  ```
+- Pattern zaten B5 T10 `tap_area_sfx_test` için kurulmuştu; lifecycle testleri de aynı pattern'i kullanmalı.
+
+### Ders: audioplayers 6.x `AudioContext` const değil
+**Problem:** B5 T6 plan snippet `const AudioContext(...)` yazıyordu. Compile hata: `AudioContextIOS` constructor non-const.
+
+**Kök neden:** audioplayers 6.6.0'da `AudioContextIOS` constructor runtime assert'lere sahip (`assert(frameworksIsSet)` gibi) → const constructor olamıyor. Nested `AudioContextAndroid` const, outer `AudioContext` non-const.
+
+**Önleme kuralı:** audioplayers config: outer `AudioContext(...)` non-const, nested `AudioContextAndroid(...)` const kalabilir. `const` keyword'u minimum seviyede uygula. Paket API versiyonu değişince re-verify.
+
+### Ders: `unawaited(future)` try/catch async error'u yakalamaz
+**Problem:** B5 T9 `_onResume` içinde `try { unawaited(resumeAmbient()); } catch {...}` pattern'i kullanıldı. Code review bulgusu: unawaited sync type-erasure; async throw Zone.handleUncaughtError'a kaçar, try/catch sync throw'u yakalar (ki ref.read ne throw eder ne de).
+
+**Önleme kuralı:** Async error'ı fire-and-forget path'te yakalamak için `.catchError` future'a direkt attach et:
+```dart
+unawaited(
+  someFuture().catchError((Object e, StackTrace st) => debugPrint('...')),
+);
+```
+`try { unawaited(...) } catch` pattern'ı cosmetic, pratikte hiçbir şey yakalamaz. T9-fix commit `894b0b7` ile düzeltildi.
+
+### Ders: Wall-clock gate testi `fakeAsync` ile çalışmaz
+**Problem:** B5 T10 `tapCrumb` 80ms throttle `DateTime.now()` kullanıyor. `tester.pump(Duration(milliseconds: 100))` fake-async advance eder ama `DateTime.now()` sistem clock'tan okur, fake clock değil. Test assert "5 paced tap → 5 SFX" fail eder.
+
+**Önleme kuralı:** Wall-clock (`DateTime.now()`) gate'li kod için test pattern:
+```dart
+await tester.runAsync(() async {
+  for (var i = 0; i < 5; i++) {
+    await tester.tap(tap);
+    await Future<void>.delayed(const Duration(milliseconds: 100)); // real delay
+  }
+});
+```
+`runAsync` içinde gerçek clock advance eder. `fakeAsync`/`pump(Duration)` alternatifi değildir — yalnız periodic/delayed Timer'lar için çalışır.
