@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:crumbs/app/boot/app_bootstrap.dart';
 import 'package:crumbs/app/boot/firebase_bootstrap.dart';
 import 'package:crumbs/app/error/error_screen.dart';
 import 'package:crumbs/app/lifecycle/app_lifecycle_gate.dart';
 import 'package:crumbs/app/routing/app_router.dart';
+import 'package:crumbs/core/audio/audio_engine.dart';
 import 'package:crumbs/core/preferences/onboarding_prefs.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/features/tutorial/tutorial_scaffold.dart';
@@ -18,6 +21,14 @@ Future<void> main() async {
   await boot.container
       .read(onboardingPrefsProvider.notifier)
       .ensureLoaded();
+
+  // B5 — audio engine lazy init (fire-and-forget).
+  // Cold start uncoupled from platform audio config (200-500ms).
+  // Pre-init plays are safely queued via _initCompleter race guard.
+  unawaited(Future.microtask(
+    () => boot.container.read(audioEngineProvider).init(),
+  ));
+
   runApp(
     UncontrolledProviderScope(
       container: boot.container,
