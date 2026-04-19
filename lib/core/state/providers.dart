@@ -31,3 +31,11 @@ final costCurveProvider = Provider.family<num, (String, int)>((ref, args) {
     owned,
   );
 });
+
+/// Current global multiplier from upgrades — used by Session Recap modal
+/// to display passive multiplier secondary line (spec B6 §2.1).
+final multiplierChainTotalProvider = Provider<double>((ref) {
+  final gs = ref.watch(gameStateNotifierProvider).value;
+  if (gs == null) return 1.0;
+  return MultiplierChain.globalMultiplier(gs.upgrades.owned);
+});

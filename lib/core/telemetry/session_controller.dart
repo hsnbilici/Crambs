@@ -22,6 +22,10 @@ class SessionController {
   String? _currentSessionId;
   DateTime? _sessionStartedAt;
 
+  /// Current active session UUID; null when no session is active (pre-launch
+  /// veya post-pause). SessionRecapModal telemetry wiring için public expose.
+  String? get currentSessionId => _currentSessionId;
+
   TelemetryLogger get _logger => _ref.read(telemetryLoggerProvider);
 
   /// [isFirstLaunch]: true when this is the user's first session ever

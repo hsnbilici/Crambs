@@ -154,3 +154,73 @@ class UpgradePurchased extends TelemetryEvent {
         'cost': cost,
       };
 }
+
+class SessionRecapShown extends TelemetryEvent {
+  const SessionRecapShown({
+    required this.installId,
+    required this.sessionId,
+    required this.offlineDurationMs,
+    required this.resourceEarnedOffline,
+  });
+
+  final String installId;
+  final String sessionId;
+  final int offlineDurationMs;
+  final int resourceEarnedOffline;
+
+  @override
+  String get eventName => 'session_recap_shown';
+
+  @override
+  Map<String, Object?> get payload => {
+        'install_id': installId,
+        'session_id': sessionId,
+        'offline_duration_ms': offlineDurationMs,
+        'resource_earned_offline': resourceEarnedOffline,
+      };
+}
+
+class SessionRecapActionTaken extends TelemetryEvent {
+  const SessionRecapActionTaken({
+    required this.installId,
+    required this.sessionId,
+    required this.actionType,
+  });
+
+  final String installId;
+  final String sessionId;
+  final String actionType;
+
+  @override
+  String get eventName => 'session_recap_action_taken';
+
+  @override
+  Map<String, Object?> get payload => {
+        'install_id': installId,
+        'session_id': sessionId,
+        'action_type': actionType,
+      };
+}
+
+class SessionRecapDismissed extends TelemetryEvent {
+  const SessionRecapDismissed({
+    required this.installId,
+    required this.sessionId,
+  });
+
+  final String installId;
+  final String sessionId;
+
+  @override
+  String get eventName => 'session_recap_dismissed';
+
+  @override
+  Map<String, Object?> get payload => {
+        'install_id': installId,
+        'session_id': sessionId,
+      };
+}
+
+/// Session Recap CTA action type literals. B7 enum refactor candidate —
+/// spec §5.3 #12.
+const String kActionCollect = 'collect';

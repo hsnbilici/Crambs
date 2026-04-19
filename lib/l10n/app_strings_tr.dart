@@ -151,6 +151,35 @@ class AppStringsTr extends AppStrings {
   String get settingsAudioMasterVolume => 'Genel Ses';
 
   @override
+  String get sessionRecapTitle => 'Yokken kazandın!';
+
+  @override
+  String sessionRecapEarned(String amount) {
+    return '$amount Crumb';
+  }
+
+  @override
+  String sessionRecapElapsed(String duration) {
+    return '$duration boyunca';
+  }
+
+  @override
+  String sessionRecapCapped(int hours) {
+    return '$hours saat sınırına ulaşıldı';
+  }
+
+  @override
+  String sessionRecapMultiplier(String value) {
+    return 'Pasif çarpan: ×$value';
+  }
+
+  @override
+  String get sessionRecapCollect => 'Topla';
+
+  @override
+  String get sessionRecapDismiss => 'Kapat';
+
+  @override
   String get settingsDevSection => 'Geliştirici';
 
   @override

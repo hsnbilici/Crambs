@@ -271,6 +271,9 @@ Yanlış uygulanması kolay olan noktalar:
 - **Tap feedback throttle gate ([I22]):** `GameStateNotifier.tapCrumb()` `bool` döner — `_triggerHaptic()` throttle sonucu. TapArea `didFire ? playCue(SfxCue.tap) : pass`. Haptic + SFX ortak 80ms gate. Rapid tap'te ikisi birden skip'lenir; stacking kakofoni'si önlenir. Başka throttled feedback eklenirse (haptic.selectionClick vs.) aynı pattern'e koy — ikinci gate açma.
 - **AppLifecycleGate onPause ordering ([I23]):** `pauseAmbient → persistNow → session.onPause`. Audio en önce (iOS kill'de ses ortada kalmasın); audio fail `try/catch` ile yutulur — persist'i asla bloklayamaz ([I6] invariant korunur). onResume: `persist+session restore → resumeAmbient`. `_onDetach` aynı pattern.
 - **Audio asset Git LFS threshold note:** B5 placeholder set ~135KB (4 SFX ≤ 4KB each + 1 ambient ~120KB). Repo inline kabul edilebilir. Yeni dönem ambient track'leri eklenirse (industrial/galactic, 60sn ×128kbps = ~900KB each) 3MB+ threshold'a yaklaşır — `git lfs track "*.ogg"` migration gerekebilir (backlog). `_dev/tasks/post-b5-audio-asset-curation.md` Sprint D ile senkron.
+- **Session Recap cold-start + Home-route push (I24):** Modal yalnız cold-start'ta ve yalnız Home route'unda push edilir. `OfflineReport` yalnız `GameStateNotifier.build()` hydrate'te set edilir; `applyResumeDelta` hot-resume push etmez (B1 invariant). HomePage dual-gate trigger: `initState` postFrameCallback (fresh mount'ta mevcut value yakalar — non-Home first-mount senaryosu) + `ref.listen` (live change — boot Home-first senaryosu). Non-Home'da modal görünmez; Home'a navigate'te yakalanır.
+- **Session Recap Crumbs ledger CTA-independent (I25):** `state.inventory.r1Crumbs` hydrate'te artırılır (B1 existing logic). Collect vs Dismiss — aynı Crumbs ledger. Modal presentation + telemetry branch fark. Dismiss'te Crumbs kaybı YOK; paternalistik "forced ceremony 1500ms" reddedildi. Yeni CTA eklenirse (B7 Take Action) aynı invariant: modal lifecycle state'ten bağımsız.
+- **Session Recap clear() sole guard (I26):** `offlineReportProvider.clear()` single source of truth for one-shot modal. Local `_modalShown` bool YOK. Collect + Dismiss + barrier dismiss (host post-return) hepsi clear çağırır. `SessionRecapHost.show` başında null-check defensive idempotent. Riverpod `ref.listen` default `fireImmediately: false` — provider kurulumundaki value listen'e gelmez, yalnız sonraki değişimler.
 
 ## 13. Açık sorulara alınan kararlar (PRD §19)
 Tüm sorular 2026-04-16 tarihinde karara bağlandı. Sayısal değerler playtest sonrası ayarlanabilir; `docs/economy.md §11` tek parametre kaynağıdır.
@@ -298,6 +301,24 @@ Brainstorming + implementation döngüsünde alınan kalıcı teknik kararlar:
 - `TutorialStarted.isReplay` payload bool, `consumeReplayFlag()` single-use reader ile set edilir (invariant [I20]).
 - Developer settings subsection `developerVisibilityProvider` flag-gated; production'da gizli (flag default false; B4'te geliştirme için true).
 - Event catalog B4'te genişledi: `purchase_made` (building_id/cost/owned_after), `upgrade_purchased` (upgrade_id/cost). Firebase reserved prefix invariant test her yeni event'te enforce edilir.
+
+**B5 — Audio layer + invariants:**
+- Paket: `audioplayers ^6.x` (multi-SFX concurrent + single ambient loop).
+- iOS: `AVAudioSessionCategory.ambient` — silent switch respect. Android: STREAM_MUSIC.
+- Defaults: `musicEnabled=false` (opt-in), `sfxEnabled=true` (tap feedback), `masterVolume=0.7`.
+- Asset: `.ogg` CC0 placeholder B5 ship; quality curation post-launch (`_dev/tasks/post-b5-audio-asset-curation.md`).
+- Invariants: [I21] fail-silent, [I22] haptic+SFX ortak throttle, [I23] onPause `audio→persist→session`.
+
+**B6 — Session Recap Modal (MVP lean):**
+- Scope C hybrid — earned + counter animation + 2 CTA + pasif çarpan secondary line. "En çok katkı / 3 aksiyon / unlock bandı" Sprint B7+ ertelenir.
+- State machine: mevcut `offlineReportProvider` reuse (new Notifier YOK).
+- Modal widget: `showGeneralDialog` + `barrierDismissible: true` + `transitionDuration` low-motion control.
+- Counter: `TweenAnimationBuilder<double>` (flutter_animate YERİNE — B2 Timer leak lesson avoid).
+- `resourceEarnedOffline: int` (B4 `cost: int` pattern paralel).
+- `const kActionCollect = 'collect';` (B7 enum refactor candidate).
+- Gate: `earned.toInt() > 0` — int floor (0 < earned < 1 edge elenir, silent no-modal).
+- B1 SnackBar path REPLACED — modal covers earned > 0, earned==0 no feedback.
+- Invariants: [I24] cold-start+Home-only, [I25] Crumbs ledger CTA-independent, [I26] clear() sole guard.
 
 ## 14. Referans
 - Ürün kararları, ekonomi ilkeleri, unlock ağacı, sprint planı → `cookie_clicker_derivative_prd.md`

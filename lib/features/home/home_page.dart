@@ -1,32 +1,47 @@
+import 'dart:async';
+
+import 'package:crumbs/core/feedback/offline_report.dart';
 import 'package:crumbs/core/feedback/save_recovery.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/features/home/widgets/crumb_counter_header.dart';
 import 'package:crumbs/features/home/widgets/floating_number_overlay.dart';
 import 'package:crumbs/features/home/widgets/onboarding_hint.dart';
 import 'package:crumbs/features/home/widgets/tap_area.dart';
+import 'package:crumbs/features/session_recap/session_recap_host.dart';
 import 'package:crumbs/features/tutorial/keys.dart';
 import 'package:crumbs/l10n/app_strings.dart';
-import 'package:crumbs/ui/format/number_format.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final report = ref.read(offlineReportProvider);
+      _maybeShowSessionRecap(report);
+    });
+  }
+
+  void _maybeShowSessionRecap(OfflineReport? report) {
+    if (report == null || report.earned.toInt() <= 0) return;
+    if (!mounted) return;
+    unawaited(SessionRecapHost.show(context, ref, report));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref
-      ..listen(offlineReportProvider, (_, next) {
-        if (next == null) return;
-        final s = AppStrings.of(context)!;
-        final mins = next.elapsed.inMinutes;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(s.welcomeBack(fmt(next.earned), '$mins dk')),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        ref.read(offlineReportProvider.notifier).clear();
+      ..listen<OfflineReport?>(offlineReportProvider, (_, next) {
+        _maybeShowSessionRecap(next);
       })
       ..listen(saveRecoveryProvider, (_, next) {
         if (next == null) return;
