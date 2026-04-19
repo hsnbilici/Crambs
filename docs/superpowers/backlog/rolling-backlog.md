@@ -42,11 +42,6 @@
 
 ## 2. B5 post-merge polish (final reviewer)
 
-### Important — merge öncesi tercih edilir
-- [ ] **`building_row_sfx_test` widget test'e çevir** — şu an contract-theater (widget mount etmiyor, doğrudan `playCue` çağırıp assert ediyor; `_onBuy`'dan cue drop edilse test geçer). Fix: `pumpWidget(BuildingRow)` + `tester.tap(FilledButton)` + `fake.oneShots` assertion.
-- [ ] **`upgrade_row_sfx_test` oluştur** — mevcut suite'te upgrade SFX widget-layer coverage YOK. Yukarıdaki pattern kopya.
-- [ ] **[I23] integration test triple-order assertion** — `integration_test/audio_lifecycle_integration_test.dart` şu an sadece `pauseLoop` called assert ediyor. `_OrderRecorder`'a persist + session marker ekle: `log == ['audio.pauseLoop', 'persist.save', 'session.onPause']`.
-
 ### Minor — post-merge
 - [ ] **Bootstrap race guard** — `lib/main.dart`'ta `await audioSettingsProvider.future` ekle, `audioControllerProvider` read'i öncesi. Mevcut `<100ms` race penceresinde kullanıcı persisted `sfxEnabled: false` varken default `true` SFX çalabilir.
 - [ ] **Audio asset Git LFS migration** — mevcut ~135KB inline OK; industrial+galactic ambient (~900KB each) eklenirse 3MB threshold aşılır. `git lfs track "*.ogg"` migration. `_dev/tasks/post-b5-audio-asset-curation.md` Sprint D ile senkron.
@@ -117,15 +112,10 @@
 
 ## 7. `_dev/tasks/lessons.md` eklentileri
 
-Mevcut dosya Sprint A-B4 deneyimleriyle güncel. Eklenmemiş dersler:
+B5 polish commit `0614963` ile 7 yeni ders eklendi (asset wildcard CRITICAL + 6 diğer). Sprint A-B4 dersler mevcut. Pending:
 
-- [ ] **flutter_animate repeat() test env timer leak** (B2 T9) — `AnimationController + SingleTickerProviderStateMixin` kullan. PulseHalo bu pattern'de.
-- [ ] **ProviderContainer + path_provider** (B2 T15) — test'te real path_provider fail; `saveRepositoryProvider` override + temp-dir pattern zorunlu.
-- [ ] **audioplayers 6.6.0 `const AudioContext` yok** (B5 T6) — `AudioContextIOS` non-const constructor. Factory veya builder pattern, nested `AudioContextAndroid` const kalabilir.
-- [ ] **Riverpod 3 `overrideWithValue` builder skip'ler** (B5 T8) — `ref.onDispose` register olmaz. `overrideWith((ref) { ref.onDispose(...); return fake; })` production semantics mirror etmek için.
-- [ ] **Flutter `assets: - assets/` NON-recursive** (B5 T14-fix CRITICAL) — subdirectory'leri explicit listeler. Plan assumption "wildcard" YANLIŞ. Her yeni asset dizini için ayrı entry.
-- [ ] **`unawaited()` + fire-and-forget audio pattern** (B5 T8/T10/T11/T12) — ref.listen callback + onDispose + widget-side audio call'lar `unawaited` wrap; T9-fix: `.catchError` gerekli çünkü `unawaited(try-catch)` async throw'u yutmaz.
-- [ ] **Wall-clock throttle test pattern** (B5 T10) — `DateTime.now()` gate'li feature test'leri `tester.runAsync + Future.delayed` kullanır; `tester.pump(Duration)` fake-async çalışmaz.
+- [ ] **flutter_animate repeat() test env timer leak** (B2 T9) — `AnimationController + SingleTickerProviderStateMixin` kullan. PulseHalo bu pattern'de. (B5 `.shake()` Timer leak dersi eklendi; repeat() variant ayrı note değeri olabilir.)
+- [ ] **ProviderContainer + path_provider** (B2 T15) — test'te real path_provider fail; `saveRepositoryProvider` override + temp-dir pattern zorunlu. (Implicit in B5 lessons "GameStateNotifier hydrate pre-boot" ama explicit yazılabilir.)
 
 ---
 
