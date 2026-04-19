@@ -109,6 +109,8 @@ xcrun simctl spawn booted log stream --predicate 'process == "Runner"' --level d
 - `docs/ci-plan.md` ✓ — GitHub Actions workflow şablonları
 - `docs/visual-design.md` ✓ — görsel kimlik brief'i (hex YOK, tasarımcı kesinleştirir)
 - `docs/firebase-setup.md` ✓ — Firebase onboarding runbook (flutterfire configure, CI secret mgmt macOS+Linux, Crashlytics manual verification, privacy note) [B3 T12]
+- `docs/audio-plan.md` ✓ — audio paket seçimi, platform parity manuel QA, asset placeholder strategy, invariant'lar [I21][I22][I23] [B5 T13]
+- `docs/audio-licenses.md` ✓ — asset kaynak + lisans tablosu (placeholder set; quality curation post-B5 task) [B5 T13]
 
 **Sprint dokümanları** (brainstorming + writing-plans workflow):
 - `docs/superpowers/specs/` — brainstorming çıktısı design doc'ları (YYYY-MM-DD-<feature>-design.md)
@@ -133,6 +135,7 @@ lib/
     telemetry/      # TelemetryLogger + InstallIdNotifier + SessionController + FirebaseAnalyticsLogger (B2/B3)
     tutorial/       # TutorialNotifier (AsyncNotifier) + step enum + state (B2)
     launch/         # FirstBootNotifier — AppInstall trigger source, tutorial disjoint (B4)
+    audio/          # AudioEngine + AudioController + AudioSettings (B5)
   features/
     home/
     shop/
@@ -264,6 +267,10 @@ Yanlış uygulanması kolay olan noktalar:
 - **kAgeNotLoaded (-1) sentinel pattern:** `InstallIdNotifier.installIdAgeMs` getter'ı `_createdAt == null` ise `-1` döner (`kAgeNotLoaded` sabit). Pre-ensureLoaded race state → integration test [I15] bu sentinel'ı production emission'da reddeder. SessionStart payload'a wiring'de `?? 0` fallback YAZMAYIN — bug sinyali olarak `-1` propagate edilir, B2 `<not-loaded>` string sentinel pattern'iyle hizalı. Clock-backward guard: `diff < 0 ? 0 : diff` (negative aggregation dashboard'u kirletir).
 - **FirstBootNotifier disjoint pattern (B4):** `lib/core/launch/first_boot_notifier.dart` — AppInstall trigger source olarak `crumbs.first_launch_observed` bool pref kullanır. `tutorialState.firstLaunchMarked` B3/earlier'da trigger'dı, B4'te sadece tutorial semantic korur. `TutorialNotifier.reset()` bu provider'a dokunmaz — tutorial replay AppInstall re-emit etmez (invariant [I18]). Migration proxy: `install_id` varlığı B1+ user sinyali — pre-B4 install'larda backfill observed=true (AppInstall suppressed). Pattern'ı yeni launch-gated event'lerde reuse et: separate pref, separate Notifier, disjoint from other state providers.
 - **consumeReplayFlag single-use pattern (B4):** `TutorialNotifier.consumeReplayFlag()` in-memory bool `_replayTriggered` single-use reader — `reset()` true'ya flip'ler, ilk caller false'a sıfırlar. `TutorialStarted.isReplay` payload'ında kullanılır (invariant [I20]). Pattern: future telemetry event'lerinde "was this triggered by X vs default flow" sinyali için reuse edilebilir. Dashboard cohort funnel `WHERE is_replay=0` integrity'si bu pattern'e bağlı.
+- **Audio engine fail-silent invariant ([I21]):** `AudioplayersEngine` init fail → `_failed=true`; dispose → `_disposed=true`. Tüm play metodları sonrasında no-op (throw etmez). Gerekçe: B3 `FirebaseBootstrap.isInitialized` paterniyle paralel — gameplay etkilenmez, "sessiz app" kullanıcı için acceptable. Yeni audio caller eklerken `_failed` guard'a güven — manuel check yapma.
+- **Tap feedback throttle gate ([I22]):** `GameStateNotifier.tapCrumb()` `bool` döner — `_triggerHaptic()` throttle sonucu. TapArea `didFire ? playCue(SfxCue.tap) : pass`. Haptic + SFX ortak 80ms gate. Rapid tap'te ikisi birden skip'lenir; stacking kakofoni'si önlenir. Başka throttled feedback eklenirse (haptic.selectionClick vs.) aynı pattern'e koy — ikinci gate açma.
+- **AppLifecycleGate onPause ordering ([I23]):** `pauseAmbient → persistNow → session.onPause`. Audio en önce (iOS kill'de ses ortada kalmasın); audio fail `try/catch` ile yutulur — persist'i asla bloklayamaz ([I6] invariant korunur). onResume: `persist+session restore → resumeAmbient`. `_onDetach` aynı pattern.
+- **Audio asset Git LFS threshold note:** B5 placeholder set ~135KB (4 SFX ≤ 4KB each + 1 ambient ~120KB). Repo inline kabul edilebilir. Yeni dönem ambient track'leri eklenirse (industrial/galactic, 60sn ×128kbps = ~900KB each) 3MB+ threshold'a yaklaşır — `git lfs track "*.ogg"` migration gerekebilir (backlog). `_dev/tasks/post-b5-audio-asset-curation.md` Sprint D ile senkron.
 
 ## 13. Açık sorulara alınan kararlar (PRD §19)
 Tüm sorular 2026-04-16 tarihinde karara bağlandı. Sayısal değerler playtest sonrası ayarlanabilir; `docs/economy.md §11` tek parametre kaynağıdır.

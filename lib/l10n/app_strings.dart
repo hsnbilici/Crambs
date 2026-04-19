@@ -352,11 +352,11 @@ abstract class AppStrings {
   /// **'Efektler'**
   String get settingsAudioSfxToggle;
 
-  /// No description provided for @settingsAudioStubHint.
+  /// No description provided for @settingsAudioMasterVolume.
   ///
   /// In tr, this message translates to:
-  /// **'Yakında aktif olacak'**
-  String get settingsAudioStubHint;
+  /// **'Genel Ses'**
+  String get settingsAudioMasterVolume;
 
   /// No description provided for @settingsDevSection.
   ///

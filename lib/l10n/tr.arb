@@ -52,7 +52,7 @@
   "settingsAudioSection": "Ses ve Müzik",
   "settingsAudioMusicToggle": "Müzik",
   "settingsAudioSfxToggle": "Efektler",
-  "settingsAudioStubHint": "Yakında aktif olacak",
+  "settingsAudioMasterVolume": "Genel Ses",
   "settingsDevSection": "Geliştirici",
   "settingsDevTestCrash": "Test Crash Gönder",
   "settingsDevTestCrashHint": "Crashlytics doğrulama — cihaz yeniden açıldığında rapor gönderilir",

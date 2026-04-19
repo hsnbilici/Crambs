@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:crumbs/app/lifecycle/app_lifecycle_gate.dart';
+import 'package:crumbs/core/audio/audio_engine.dart';
 import 'package:crumbs/core/save/save_repository.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,9 @@ void main() {
         saveRepositoryProvider.overrideWithValue(
           SaveRepository(directoryProvider: () async => tempDir.path),
         ),
+        // T9: audio wired into _onPause; use fake engine to avoid the real
+        // AudioplayersEngine hitting missing platform channels in unit env.
+        audioEngineProvider.overrideWithValue(FakeAudioEngine()),
       ]);
       await container.read(gameStateNotifierProvider.future);
       final notifier = container.read(gameStateNotifierProvider.notifier);
