@@ -53,6 +53,25 @@
   "settingsAudioMusicToggle": "Müzik",
   "settingsAudioSfxToggle": "Efektler",
   "settingsAudioMasterVolume": "Genel Ses",
+  "sessionRecapTitle": "Yokken kazandın!",
+  "sessionRecapEarned": "{amount} Crumb",
+  "@sessionRecapEarned": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "sessionRecapElapsed": "{duration} boyunca",
+  "@sessionRecapElapsed": {
+    "placeholders": { "duration": { "type": "String" } }
+  },
+  "sessionRecapCapped": "{hours} saat sınırına ulaşıldı",
+  "@sessionRecapCapped": {
+    "placeholders": { "hours": { "type": "int" } }
+  },
+  "sessionRecapMultiplier": "Pasif çarpan: ×{value}",
+  "@sessionRecapMultiplier": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "sessionRecapCollect": "Topla",
+  "sessionRecapDismiss": "Kapat",
   "settingsDevSection": "Geliştirici",
   "settingsDevTestCrash": "Test Crash Gönder",
   "settingsDevTestCrashHint": "Crashlytics doğrulama — cihaz yeniden açıldığında rapor gönderilir",

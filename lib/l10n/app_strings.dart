@@ -358,6 +358,48 @@ abstract class AppStrings {
   /// **'Genel Ses'**
   String get settingsAudioMasterVolume;
 
+  /// No description provided for @sessionRecapTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yokken kazandın!'**
+  String get sessionRecapTitle;
+
+  /// No description provided for @sessionRecapEarned.
+  ///
+  /// In tr, this message translates to:
+  /// **'{amount} Crumb'**
+  String sessionRecapEarned(String amount);
+
+  /// No description provided for @sessionRecapElapsed.
+  ///
+  /// In tr, this message translates to:
+  /// **'{duration} boyunca'**
+  String sessionRecapElapsed(String duration);
+
+  /// No description provided for @sessionRecapCapped.
+  ///
+  /// In tr, this message translates to:
+  /// **'{hours} saat sınırına ulaşıldı'**
+  String sessionRecapCapped(int hours);
+
+  /// No description provided for @sessionRecapMultiplier.
+  ///
+  /// In tr, this message translates to:
+  /// **'Pasif çarpan: ×{value}'**
+  String sessionRecapMultiplier(String value);
+
+  /// No description provided for @sessionRecapCollect.
+  ///
+  /// In tr, this message translates to:
+  /// **'Topla'**
+  String get sessionRecapCollect;
+
+  /// No description provided for @sessionRecapDismiss.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kapat'**
+  String get sessionRecapDismiss;
+
   /// No description provided for @settingsDevSection.
   ///
   /// In tr, this message translates to:
