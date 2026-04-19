@@ -1,3 +1,4 @@
+import 'package:crumbs/core/economy/offline_progress.dart';
 import 'package:crumbs/core/feedback/offline_report.dart';
 import 'package:crumbs/core/state/game_state_notifier.dart';
 import 'package:crumbs/core/state/providers.dart';
@@ -65,7 +66,7 @@ class SessionRecapModal extends ConsumerWidget {
                 if (report.capped) ...[
                   const SizedBox(height: 8),
                   Text(
-                    s.sessionRecapCapped(8),
+                    s.sessionRecapCapped(OfflineProgress.kOfflineCap.inHours),
                     style: theme.textTheme.bodySmall,
                   ),
                 ],

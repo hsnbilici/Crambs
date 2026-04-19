@@ -10,8 +10,9 @@ class OfflineProgress {
 
   /// B1'den itibaren 12 saat cap — shock-value snackbar'ı engeller.
   /// A'da 24h idi; B1'de economy playtest kararı ile 12h'a indirildi
-  /// (spec §1.1 in-scope).
-  static const Duration _kOfflineCap = Duration(hours: 12);
+  /// (spec §1.1 in-scope). Public for Session Recap modal UI (B6 —
+  /// UI/economy drift önlemi).
+  static const Duration kOfflineCap = Duration(hours: 12);
 
   static OfflineReport compute(
     GameState state,
@@ -20,8 +21,8 @@ class OfflineProgress {
   }) {
     final last = DateTime.parse(state.meta.lastSavedAt);
     final rawElapsed = now.difference(last);
-    final capped = rawElapsed > _kOfflineCap;
-    final effective = capped ? _kOfflineCap : rawElapsed;
+    final capped = rawElapsed > kOfflineCap;
+    final effective = capped ? kOfflineCap : rawElapsed;
     final earned = Production.tickDelta(
       state.buildings.owned,
       effective.inMicroseconds / 1e6,
